@@ -1,2 +1,0 @@
-# Get initial contact position (for Baumgart correction)
-pin.framesForwardKinematics(model, data, robot.q0)

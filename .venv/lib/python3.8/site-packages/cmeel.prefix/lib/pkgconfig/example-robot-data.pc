@@ -1,0 +1,22 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${pcfiledir}/../..
+libdir=${pcfiledir}/../../lib
+bindir=${pcfiledir}/../../bin
+pkglibdir=${pcfiledir}/../../lib/example-robot-data
+includedir=${pcfiledir}/../../include
+datarootdir=${pcfiledir}/../../share
+pkgdatarootdir=${pcfiledir}/../../share
+docdir=${pcfiledir}/../../share/doc/example-robot-data
+doxygendocdir=${pcfiledir}/../../share/doc/example-robot-data/doxygen-html
+
+Name: example-robot-data
+Description: Set of robot URDFs for benchmarking and developed examples.
+URL: https://github.com/gepetto/example-robot-data
+Version: 4.0.7
+Requires: 
+Conflicts: 
+Libs: -L${libdir} 
+Libs.private: 
+Cflags:  -I${includedir}
+
+

@@ -1,0 +1,27 @@
+Metadata-Version: 2.1
+Name: cmeel-console-bridge
+Version: 1.0.2.1
+Summary: cmeel distribution for console-bridge, A ROS-independent package for logging that seamlessly pipes into rosconsole/rosout for ROS-dependent packages.
+License-Expression: Zlib
+Requires-Python: >= 3.7
+Home-page: https://github.com/cmake-wheel/cmeel-console-bridge
+Requires-Dist: cmeel
+Description-Content-Type: text/markdown
+
+# console_bridge
+
+`console_bridge` is a ROS-independent, pure CMake (i.e. non-catkin and non-rosbuild package) that provides logging calls that mirror those found in rosconsole, but for applications that are not necessarily using ROS.
+
+## Quality Declaration
+
+This package claims to be in the **Quality Level 1** category, see the [Quality Declaration](./QUALITY_DECLARATION.md) for more details.
+
+## Features
+
+This library allows to log messages in the standard output and the standard output error based on the log level:
+
+ - CONSOLE_BRIDGE_LOG_DEBUG
+ - CONSOLE_BRIDGE_LOG_INFO
+ - CONSOLE_BRIDGE_LOG_WARN
+ - CONSOLE_BRIDGE_LOG_ERROR
+ - CONSOLE_BRIDGE_LOG_NONE

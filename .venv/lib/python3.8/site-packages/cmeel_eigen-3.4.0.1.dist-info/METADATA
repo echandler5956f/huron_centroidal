@@ -1,0 +1,16 @@
+Metadata-Version: 2.1
+Name: cmeel-eigen
+Version: 3.4.0.1
+Summary: cmeel distribution for Eigen. Eigen is a C++ template library for linear algebra: matrices, vectors, numerical solvers, and related algorithms.
+License-Expression: Apache-2.0
+Requires-Python: >= 3.7
+Home-page: https://github.com/cmeel/cmeel-eigen
+Project-URL: Repository, https://github.com/cmeel/cmeel-eigen.git
+Requires-Dist: cmeel
+Description-Content-Type: text/markdown
+
+**Eigen is a C++ template library for linear algebra: matrices, vectors, numerical solvers, and related algorithms.**
+
+For more information go to http://eigen.tuxfamily.org/.
+
+For ***pull request***, ***bug reports***, and ***feature requests***, go to https://gitlab.com/libeigen/eigen.

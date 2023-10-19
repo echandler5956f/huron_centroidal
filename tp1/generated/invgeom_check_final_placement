@@ -1,4 +1,0 @@
-print(
-    "The robot finally reached effector placement at\n",
-    robot.placement(sol_q, 6),
-)

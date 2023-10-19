@@ -1,2 +1,0 @@
-cmodel = cpin.Model(model)
-cdata = cmodel.createData()

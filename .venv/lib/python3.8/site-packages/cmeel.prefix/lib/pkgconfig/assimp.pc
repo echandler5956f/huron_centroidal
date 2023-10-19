@@ -1,0 +1,9 @@
+libdir=/tmp/cmeel-40wd4doh/pfx/cmeel.prefix/lib
+includedir=/tmp/cmeel-40wd4doh/pfx/cmeel.prefix/include
+
+Name: Assimp
+Description: Import various well-known 3D model formats in an uniform manner.
+Version: 5.2.4
+Libs: -L${libdir} -lassimp
+Libs.private: -lstdc++ -lz
+Cflags: -I${includedir}

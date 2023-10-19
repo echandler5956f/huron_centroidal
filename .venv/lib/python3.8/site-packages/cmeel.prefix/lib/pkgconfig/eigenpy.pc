@@ -1,0 +1,22 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${pcfiledir}/../..
+libdir=${pcfiledir}/../../lib
+bindir=${pcfiledir}/../../bin
+pkglibdir=${pcfiledir}/../../lib/eigenpy
+includedir=${pcfiledir}/../../include
+datarootdir=${pcfiledir}/../../share
+pkgdatarootdir=${pcfiledir}/../../share
+docdir=
+doxygendocdir=
+
+Name: eigenpy
+Description: Bindings between Numpy and Eigen using Boost.Python
+URL: http://github.com/stack-of-tasks/eigenpy
+Version: 3.1.0
+Requires: eigen3 >= 3.0.5
+Conflicts: 
+Libs: -L${libdir}  -leigenpy -L/tmp/pip-build-env-uetcop25/overlay/lib/python3.8/site-packages/cmeel.prefix/lib
+Libs.private: 
+Cflags:  -I${includedir} -I/opt/_internal/cpython-3.8.17/include/python3.8 -I/tmp/pip-build-env-uetcop25/overlay/lib/python3.8/site-packages/numpy/core/include
+
+

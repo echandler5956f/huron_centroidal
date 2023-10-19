@@ -1,0 +1,26 @@
+Metadata-Version: 2.1
+Name: pin3x-jnrh2023
+Version: 2.9.2
+Summary: A fast and flexible implementation of Rigid Body Dynamics algorithms and their analytical derivatives - TEMPORARY PACKAGE
+Requires-Python: >=3.7
+License-Expression: BSD-3-Clause
+Home-page: https://github.com/stack-of-tasks/pinocchio
+Requires-Dist: cmeel
+Requires-Dist: cmeel-boost == 1.81.0
+Requires-Dist: cmeel-console-bridge == 1.0.2.1
+Requires-Dist: cmeel-tinyxml == 2.6.2.1
+Requires-Dist: cmeel-urdfdom-headers == 1.1.0
+Requires-Dist: cmeel-urdfdom == 3.1.0.2
+Requires-Dist: casadi == 3.6.3
+Requires-Dist: cmeel-eigen == 3.4.0.1
+Requires-Dist: cmeel-assimp == 5.2.5
+Requires-Dist: cmeel-octomap == 1.9.8.1
+Requires-Dist: numpy == 1.24.0
+Description-Content-Type: text/markdown
+
+# pin3x-jnrh
+
+Source de la version de pinocchio utilisée aux [JNRH'2023](https://jnrh2023.sciencesconf.org/)
+Ceci dépend d’une version pour l’instant privée de pinocchio-3x.
+
+C’est un paquet ayant volontairement une durée de vie très limitée: ne pas utiliser en dehors des JNRH'2023.

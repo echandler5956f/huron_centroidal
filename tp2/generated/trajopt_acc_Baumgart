@@ -1,2 +1,0 @@
-Kp = 200
-Kv = 2 * np.sqrt(Kp)

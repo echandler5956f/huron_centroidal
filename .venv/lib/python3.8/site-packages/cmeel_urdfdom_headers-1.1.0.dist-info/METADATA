@@ -1,0 +1,13 @@
+Metadata-Version: 2.1
+Name: cmeel-urdfdom-headers
+Version: 1.1.0
+Summary: cmeel distribution for urdfdom-headers, headers for URDF parsers
+License-Expression: BSD-3-Clause
+Requires-Python: >= 3.7
+Home-page: https://github.com/cmake-wheel/cmeel-urdfdom-headers
+Requires-Dist: cmeel
+Description-Content-Type: text/markdown
+
+# CMeel urdfdom-headers
+
+[urdfdom-headers](https://github.com/ros/urdfdom_headers) distribution for cmeel packages.

@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<robot 
+    xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- left leg -->
+    <xacro:macro name="huron_floating">
+
+        <joint name="CHEAT_MODE_X" type="prismatic">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+                <parent link="${parent}" />
+                <child link="worldY" />
+            <axis xyz="1 0 0" />
+            <limit lower="0" upper="0" effort="0" velocity="0" />
+            </joint>
+
+        <link name="worldY">
+        </link>
+
+        <joint name="CHEAT_MODE_Y" type="prismatic">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+                <parent link="worldY" />
+                <child link="worldZ" />
+            <axis xyz="0 1 0" />
+            <limit lower="0" upper="0" effort="0" velocity="0" />
+            </joint>
+
+        <link name="worldZ">
+        </link>
+
+        <joint name="CHEAT_MODE_Z" type="prismatic">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+                <parent link="worldZ" />
+                <child link="worldRZ" />
+            <axis xyz="0 0 1" />
+            <limit lower="0" upper="0" effort="0" velocity="0" />
+            </joint>
+
+        <link name="worldRZ">
+        </link>
+
+        <joint name="CHEAT_MODE_RZ" type="revolute">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+                <parent link="worldRZ" />
+                <child link="worldRX" />
+            <axis xyz="0 0 1" />
+            <limit lower="0" upper="0" effort="0" velocity="0" />
+            </joint>
+
+        <link name="worldRX">
+        </link>
+
+        <joint name="CHEAT_MODE_RX" type="revolute">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+                <parent link="worldRX" />
+                <child link="worldRY" />
+            <axis xyz="1 0 0" />
+            <limit lower="0" upper="0" effort="0" velocity="0" />
+            </joint>
+
+        <link name="worldRY">
+        </link>
+
+        <joint name="CHEAT_MODE_RY" type="revolute">
+            <origin xyz="0 0 0" rpy="0 0 0" />
+                <parent link="worldRY" />
+                <child link="${child}" />
+            <axis xyz="0 1 0" />
+            <limit lower="0" upper="0" effort="0" velocity="0" />
+            </joint>
+    </xacro:macro>
+</robot>
