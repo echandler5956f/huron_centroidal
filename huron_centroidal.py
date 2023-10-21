@@ -3,12 +3,13 @@ import rospy
 from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import JointState
 from std_srvs.srv import Empty, EmptyRequest
+from gazebo_msgs.srv import GetModelState, GetModelStateRequest
 
 import time
+import matplotlib.pyplot as plt
 from types import SimpleNamespace
 
 import casadi
-# import example_robot_data as robex
 import numpy as np
 import pinocchio as pin
 from pinocchio import casadi as cpin
@@ -28,23 +29,28 @@ def joint_callback(data):
 def main():
     global xc, vc, tauc
 
-    rospy.wait_for_service('/gazebo/unpause_physics')
-    unpause_physics_client = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
+    # rospy.wait_for_service('/gazebo/unpause_physics')
+    # rospy.wait_for_service('/gazebo/pause_physics')
+    # rospy.wait_for_service('gazebo/get_model_state')
+    # unpause_physics_client = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
+    # pause_physics_client = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
+    # get_model_state_client = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
 
-    effortController = rospy.Publisher('/huron/joint_group_effort_controller/command', Float64MultiArray, queue_size=100)
-    rospy.Subscriber("/huron/joint_states", JointState, joint_callback, queue_size=100)
+    # effortController = rospy.Publisher('/huron/joint_group_effort_controller/command', Float64MultiArray, queue_size=100)
+    # rospy.Subscriber("/huron/joint_states", JointState, joint_callback, queue_size=100)
 
-    rospy.init_node('huron_centroidal', anonymous=True)
+    # rospy.init_node('huron_centroidal', anonymous=True)
 
     # Change numerical print
     pin.SE3.__repr__ = pin.SE3.__str__
     np.set_printoptions(precision=2, linewidth=300, suppress=True, threshold=1e6)
 
     ### HYPER PARAMETERS
-    Mtarget = pin.SE3(pin.utils.rotate("y", np.pi/2), np.array([0.15, -0.15, 0.2]))  # x,y,z
+    Mtarget = pin.SE3(pin.utils.rotate("y", np.pi/2), np.array([0.0775, 0.05, 0.1]))  # x,y,z
     contacts = [SimpleNamespace(name="l_foot_v_ft_link", type=pin.ContactType.CONTACT_6D)]
-    fixedFootFrameName = "l_foot_v_ft_link"
+    baseFrameName = "base"
     endEffectorFrameName = "r_foot_v_ft_link"
+    fixedFootFrameName = "l_foot_v_ft_link"
 
     # --- Load robot model
     builder = RobotWrapper.BuildFromURDF
@@ -54,8 +60,11 @@ def main():
                     None,
                 )
     robot.q0 = np.array([0, 0, 1.0627, 0, 0, 0, 1,
-                        0.0000, 0.0152, -0.2884, 0.7541, -0.4657, -0.0152,
-                        0.0000, -0.0152, -0.2884, 0.7541, -0.4657, 0.0152])
+                        0.0000,  0.0000, -0.3207, 0.7572, -0.4365,  0.0000,
+                        0.0000,  0.0000, -0.3207, 0.7572, -0.4365,  0.0000])
+    
+    xc = robot.q0[7:]
+    vc = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
     # Open the viewer
     viz = MeshcatVisualizer(robot)
@@ -65,20 +74,34 @@ def main():
     model = robot.model
     data = model.createData()
 
-    pin.computeTotalMass(model, data)
     pin.framesForwardKinematics(model, data, robot.q0)
+    pin.computeTotalMass(model, data)
+    
     # Hyperparameters for the control
     Kp = 5.             # proportional gain (P of PD)
     Kv = 2 * np.sqrt(Kp) # derivative gain (D of PD)
-    T = 100
+    T = 50
     DT = 0.002
+    kp = 1e-1
+    kv = 1e-1
+    kpj = 1e-1
+    kvj = 1e-1
+    d1 = np.diagflat(np.array([kp, kp, kp, kp, kp, kp])) # Kp
+    d2 = np.diagflat(np.array([kv, kv, kv, kv, kv, kv])) # Kv
+    d3 = np.diagflat(np.array([kpj, kpj, kpj, kpj, kpj, kpj])) # Kpj
+    d4 = np.diagflat(np.array([kvj, kvj, kvj, kvj, kvj, kvj])) # Kvj
+    Kp = np.diagflat(np.vstack((np.diag(d1), np.diag(d1))))
+    Kv = np.diagflat(np.vstack((np.diag(d2), np.diag(d2))))
+    Kpj = np.diagflat(np.vstack((np.diag(d3), np.diag(d3))))
+    Kvj = np.diagflat(np.vstack((np.diag(d4), np.diag(d4))))
     mu = 0.7
     g = np.array([0, 0, 9.81])
     m = data.mass[0]
     fg = m * g
 
-    fixedFoot_ID = model.getFrameId(fixedFootFrameName)
+    base_ID = model.getFrameId(baseFrameName)
     endEffector_ID = model.getFrameId(endEffectorFrameName)
+    fixedFoot_ID = model.getFrameId(fixedFootFrameName)
     fixed_foot = data.oMf[fixedFoot_ID]
     for c in contacts:
         c.id = model.getFrameId(c.name)
@@ -86,15 +109,10 @@ def main():
         c.jid = model.frames[c.id].parentJoint
         c.placement = model.frames[c.id].placement
         c.model = pin.RigidConstraintModel(c.type, model, c.jid, c.placement)
-    # contact_models = [c.model for c in contacts]
+    contact_models = [c.model for c in contacts]
 
-    # contact_datas = [c.createData() for c in contact_models]
-
-    # pin.initConstraintDynamics(model, data, contact_models)
-    # q = robot.q0.copy()
-    # v = np.zeros(model.nv)
-    # tau = np.zeros(model.nv)
-    # pin.constraintDynamics(model, data, q, v, tau, contact_models, contact_datas)
+    # Tuning of the proximal solver (minimal version)
+    prox_settings = pin.ProximalSettings(0, 1e-6, 1)
 
     # --- Add box to represent target
     # Add a vizualization for the target
@@ -168,25 +186,14 @@ def main():
 
     cvj_ = casadi.SX.sym("vjs", nv - 6, 1)
 
-    # print(ch)
-    # print(clin)
-    # print(cang)
-    # print(cq)
-    # print(cqb)
-    # print(cqj)
-    # print(cdh)
-    # print(cdlin)
-    # print(cdang)
-    # print(cv)
-    # print(cvb)
-    # print(cvj)
-
     # Compute casadi graphs
     cpin.centerOfMass(cmodel, cdata, cq, False)
     cpin.computeCentroidalMap(cmodel, cdata, cq)
     cpin.forwardKinematics(cmodel, cdata, cq, cv)
     cpin.updateFramePlacements(cmodel, cdata)
-
+    
+    velc = cpin.getFrameVelocity(cmodel, cdata, fixedFoot_ID, pin.LOCAL).vector
+    
     # Sym graph for the integration operation x,dx -> x(+)dx = [model.integrate(q,dq),v+dv]
     cintegrate = casadi.Function(
         "integrate",
@@ -198,13 +205,9 @@ def main():
     )
 
     Ag = cdata.Ag
-    # print(Ag.shape)
     Agb = Ag[:,:6]
     Agj = Ag[:,6:]
-    # print(Agb.shape)
-    # print(Agj.shape)
-    # test = Agj*cvj
-    # print(test.shape)
+   
     # Sym graph for the integration operation x' = [ q+vDT+aDT**2, v+aDT ]
     cnext = casadi.Function(
         "next",
@@ -226,10 +229,12 @@ def main():
     error_tool = casadi.Function(
         "etool3", [cx], [cdata.oMf[endEffector_ID].translation - Mtarget.translation]
     )
+    
+    vel_foot = casadi.Function("velfoot", [cx], [velc])
 
-    error_fixed_foot = casadi.Function(
-        "efoot3", [cx], [cdata.oMf[fixedFoot_ID].translation - fixed_foot.translation]
-    )
+    # error_fixed_foot = casadi.Function(
+    #     "efoot3", [cx], [cdata.oMf[fixedFoot_ID].translation - fixed_foot.translation]
+    # )
 
     ### PROBLEM
 
@@ -245,9 +250,9 @@ def main():
     # Define the running cost
     for t in range(T):
         totalcost += 1e-3 * DT * casadi.sumsqr(var_xs[t][nh+nq+nh:]) # penalize velocities
-        totalcost += 1e-6 * DT * casadi.sumsqr(var_us[t][:3]) # penalize contact forces
+        totalcost += 1e-4 * DT * casadi.sumsqr(var_us[t][:3]) # penalize contact forces
         # totalcost += 1e-3 * DT * casadi.sumsqr(var_us[t][3:]) # penalize contact torques
-    totalcost += 1e1 * casadi.sumsqr(error_tool(var_xs[T]))
+    totalcost += 1e4 * casadi.sumsqr(error_tool(var_xs[T]))
 
     opti.subject_to(var_xs[0][nh:nq+nh] == robot.q0)
     opti.subject_to(var_xs[0][nh+nq+nh:] == 0)  # zero initial velocity
@@ -255,23 +260,24 @@ def main():
 
     # Define the integration constraints
     for t in range(T):
-        opti.subject_to(error_fixed_foot(var_xs[t]) == 0)
+        # opti.subject_to(error_fixed_foot(var_xs[t]) == 0)
+        opti.subject_to(vel_foot(var_xs[t]) == 0)
         opti.subject_to(cnext(var_xs[t], var_us[t], var_vjs[t]) == var_xs[t + 1])
         opti.subject_to(var_us[t][0]/var_us[t][2] >= -mu)
         opti.subject_to(var_us[t][0]/var_us[t][2] <= mu)
         opti.subject_to(var_us[t][1]/var_us[t][2] >= -mu)
         opti.subject_to(var_us[t][1]/var_us[t][2] <= mu)
         opti.subject_to(var_us[t][2] >= 0)
-        opti.subject_to(var_us[t][3] == 0)
-        opti.subject_to(var_us[t][4] == 0)
         opti.set_initial(var_us[t][2], fg[2])
-
-    # time.sleep(4)
 
     ### SOLVE
     opti.minimize(totalcost)
     p_opts = {"expand": True}
-    s_opts = {"max_iter": 100}
+    s_opts = {
+                "max_iter": 50, 
+                # "fixed_variable_treatment": "make_constraint",
+                # "hessian_approximation": "limited-memory",
+            }
     opti.solver("ipopt", p_opts, s_opts) # set numerical backend
     opti.callback(lambda i: displayScene(opti.debug.value(var_xs[-1][nh:nq+nh])))
 
@@ -285,42 +291,109 @@ def main():
         sol_xs = [opti.debug.value(var_x) for var_x in var_xs]
 
     print("***** Display the resulting trajectory ...")
+
+    xdes = [x[nh:nq+nh] for x in sol_xs]
+    vdes = [x[nh+nq:nh+nq+nv] for x in sol_xs]
+    ades = [((vdes[t] - vdes[t - 1])/DT) for t in range(1, T)]
+    print("xdes: ", xdes)
+    print("vdes: ", vdes)
+    print("ades: ", ades)
+
+    pf1des = []
+    pf2des = []
+    vf1des = []
+    vf2des = []
     
-    # xsol = [x[nh:nq+nh] for x in sol_xs]
-    # vsol = [x[nh+nq:nh+nq+nv] for x in sol_xs]
-    # while True:
-    #     # displayScene(robot.q0, 1)
-    #     displayTraj(xsol, DT)
-    #     xsol.reverse()
-    #     displayTraj(xsol, DT)
-    #     xsol.reverse()
+    for t in range(T):
+        pin.forwardKinematics(model, data, xdes[t], vdes[t])
+        pin.framesForwardKinematics(model, data, xdes[t])
+        vel1 = pin.getFrameVelocity(model, data, fixedFoot_ID, pin.LOCAL).vector
+        vel2 = pin.getFrameVelocity(model, data, endEffector_ID, pin.LOCAL).vector
+        
+        M1 = data.oMf[fixedFoot_ID]
+        M2 = data.oMf[endEffector_ID]
+        
+        pf1des.append(pin.SE3(M1.rotation, M1.translation))
+        pf2des.append(pin.SE3(M2.rotation, M2.translation))
+        vf1des.append(vel1)
+        vf2des.append(vel2)
+    
+    while True:
+        displayTraj(xdes, DT)
+        xdes.reverse()
+        displayTraj(xdes, DT)
+        xdes.reverse()
+    
+    taudlog = []
+    epflog = []
+    evflog = []
+    taufflog = []
+    epjlog = []
+    evjlog = []
+    taulog = []
+    
+    # unpause_physics_client(EmptyRequest())
+    # for t in range(T):
+    #     ms = get_model_state_client(GetModelStateRequest("huron", "ground_plane"))
+    #     p = ms.pose.position
+    #     o = ms.pose.orientation
+    #     vl = ms.twist.linear
+    #     al = ms.twist.angular
+    #     xcb = np.hstack(([p.x, p.y, p.z, o.x, o.y, o.z, o.w], xc))
+    #     vcb = np.hstack(([vl.x, vl.y, vl.z, al.x, al.y, al.z], vc))
 
-    xsol = [x[nh+7:nq+nh] for x in sol_xs]
-    vsol = [x[nh+6+nq:nh+nq+nv] for x in sol_xs]
-    asol = [2 * ((xsol[t+1] - xsol[t])/(DT*DT) - (vsol[t]/DT)) for t in range(T-1)]
+    #     pin.forwardKinematics(model, data, xcb, vcb)
+    #     pin.framesForwardKinematics(model, data, xcb)
+    #     vel1 = pin.getFrameVelocity(model, data, fixedFoot_ID, pin.LOCAL)
+    #     vel2 = pin.getFrameVelocity(model, data, endEffector_ID, pin.LOCAL)
+        
+    #     J1 = pin.computeFrameJacobian(model, data, xcb, fixedFoot_ID, pin.LOCAL)
+    #     J2 = pin.computeFrameJacobian(model, data, xcb, endEffector_ID, pin.LOCAL)
+        
+    #     M1_ = data.oMf[fixedFoot_ID]
+    #     M2_ = data.oMf[endEffector_ID]
+    #     M1 = pin.SE3(M1_.rotation, M1_.translation)
+    #     M2 = pin.SE3(M2_.rotation, M2_.translation)
+        
+    #     epf = np.reshape(np.hstack((pin.log(M1.inverse() * pf1des[t]).vector, pin.log(M2.inverse() * pf2des[t]).vector)), (12, 1))
+    #     evf = np.reshape(np.hstack((vf1des[t] - vel1.vector, vf2des[t] - vel2.vector)), (12, 1))
+    #     J1 = np.hstack((J1[:, 6:12], np.zeros((6,6))))
+    #     J2 = np.hstack((np.zeros((6,6)), J2[:, 12:]))
+    #     J = np.vstack((J1, J2))
+    #     tauff = np.reshape(taudes[t], (12, 1)) + np.matmul(J.transpose(), np.matmul(Kp, epf) + np.matmul(Kv, evf))
 
-    unpause_physics_client(EmptyRequest())
-    rospy.wait_for_message("/huron/joint_states", JointState, timeout=None)
-    for t in range(T-1):
-        tstart = rospy.Time.now().to_sec()
-        tauc = asol[t] + Kp * (xsol[t] - xc) + Kv * (vsol[t] - vc) 
-        while rospy.Time.now().to_sec() < tstart + DT:
-            effortController.publish(Float64MultiArray(data=tauc))
-        # xsol.reverse()
-        # vsol.reverse()
-        # asol.reverse()
-        # for t in range(T-1):
-        #     tauc = asol[t] + Kp * (xsol[t] - xc) + Kv * (vsol[t] - vc) 
-        #     effortController.publish(Float64MultiArray(data=tauc))
-        #     time.sleep(DT)
-        # xsol.reverse()
-        # vsol.reverse()
-        # asol.reverse()
+    #     tstart = rospy.Time.now().to_sec()
+    #     tnow = tstart
+    #     while tnow < tstart + DT:
+    #         epj = np.reshape(xdes[t][7:], (12, 1)) - np.reshape(xc, (12, 1))
+    #         evj = np.reshape(vdes[t][6:], (12, 1)) - np.reshape(vc, (12, 1))
+    #         tau = tauff + np.matmul(Kpj, epj) + np.matmul(Kvj, evj)
+    #         effortController.publish(Float64MultiArray(data=list(tau)))
+    #         tnow = rospy.Time.now().to_sec()
 
+    #     epflog.append(np.linalg.norm(epf))
+    #     evflog.append(np.linalg.norm(evf))
+    #     epjlog.append(np.linalg.norm(epj))
+    #     evjlog.append(np.linalg.norm(evj))
+    #     # taulog.append(tau)
+        
+    # pause_physics_client(EmptyRequest())
+    
+    # # tauarr = np.reshape(np.array(taulog), (12, T))
+    # t = np.linspace(0, T-1, T)
+    # plt.rc('lines', linewidth=2.5)
+    # fig, ax = plt.subplots()
+
+    # line1 = ax.plot(t, np.array(epflog), label='epf')
+    # line2 = ax.plot(t, np.array(evflog), label='evf')
+    # line3 = ax.plot(t, np.array(epjlog), label='epj')
+    # line4 = ax.plot(t, np.array(evjlog), label='evj')
+
+    # ax.legend(handlelength=4)
+    # plt.show()
 
 if __name__ == '__main__':
     try:
         main()
     except rospy.ROSInterruptException:
         pass
-    # main()

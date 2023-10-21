@@ -6,6 +6,7 @@ from std_srvs.srv import Empty, EmptyRequest
 from gazebo_msgs.srv import GetModelState, GetModelStateRequest
 
 import time
+import matplotlib.pyplot as plt
 from types import SimpleNamespace
 
 import casadi
@@ -42,7 +43,7 @@ def main():
 
     # Change numerical print
     pin.SE3.__repr__ = pin.SE3.__str__
-    np.set_printoptions(precision=5, linewidth=300, suppress=True, threshold=1e6)
+    np.set_printoptions(precision=2, linewidth=300, suppress=True, threshold=1e6)
 
     ### HYPER PARAMETERS
     Mtarget = pin.SE3(pin.utils.rotate("y", np.pi/2), np.array([0.0775, 0.05, 0.1]))  # x,y,z
@@ -52,10 +53,36 @@ def main():
     fixedFootFrameName = "l_foot_v_ft_link"
     T = 50
     DT = 0.002
-    Kp = 1e-3
-    Kv = 1e-3
-    Kpj = 1e-3
-    Kvj = 1e-3
+    # d1 = np.diagflat(np.array([1e-1, 1e-1, 1e-1, 1e-1, 1e-1, 1e-1])) # Kp
+    # d2 = np.diagflat(np.array([1e0, 1e0, 1e0, 1e0, 1e0, 1e0])) # Kv
+    # d3 = np.diagflat(np.array([1e-1, 1e-1, 1e-1, 1e-1, 1e-1, 1e-1])) # Kpj
+    # d4 = np.diagflat(np.array([1e0, 1e0, 1e0, 1e0, 1e0, 1e0])) # Kvj
+    # Kp = np.diagflat(np.vstack((np.diag(d1), np.diag(d1))))
+    # Kv = np.diagflat(np.vstack((np.diag(d2), np.diag(d2))))
+    # Kpj = np.diagflat(np.vstack((np.diag(d3), np.diag(d3))))
+    # Kvj = np.diagflat(np.vstack((np.diag(d4), np.diag(d4))))
+    kp = 1e-1
+    kv = 1e-1
+    kpj = 1e-1
+    kvj = 1e-1
+    d1 = np.diagflat(np.array([kp, kp, kp, kp, kp, kp])) # Kp
+    d2 = np.diagflat(np.array([kv, kv, kv, kv, kv, kv])) # Kv
+    d3 = np.diagflat(np.array([kpj, kpj, kpj, kpj, kpj, kpj])) # Kpj
+    d4 = np.diagflat(np.array([kvj, kvj, kvj, kvj, kvj, kvj])) # Kvj
+    Kp = np.diagflat(np.vstack((np.diag(d1), np.diag(d1))))
+    Kv = np.diagflat(np.vstack((np.diag(d2), np.diag(d2))))
+    Kpj = np.diagflat(np.vstack((np.diag(d3), np.diag(d3))))
+    Kvj = np.diagflat(np.vstack((np.diag(d4), np.diag(d4))))
+    
+    # options = {}
+    # options["jit"] = True
+    # options["compiler"] = 'shell'
+    # options["jit_options.compiler_flags"] = ['-O3']
+    # options["jit_options.compiler"] = 'ccache gcc'
+    # options["jit_options.verbose"] = False
+    # options["jit_options.temp_suffix"] = False
+    # options["jit_cleanup"] = False
+    # options["jit_temp_suffix"] = False
 
     # --- Load robot model
     builder = RobotWrapper.BuildFromURDF
@@ -264,11 +291,24 @@ def main():
         for c in contacts:
             correction = cbaumgart[c.name](var_xs[t])
             opti.subject_to(acontacts[c.name](var_xs[t], var_as[t]) == -correction)
-
     ### SOLVE
     opti.minimize(totalcost)
-    p_opts = {"expand": True}
-    s_opts = {"max_iter": 25}
+    jit_options = {
+                "flags": ["-O3", "-march=native"], "verbose": True, "compiler": "gcc"
+                }
+    p_opts = {
+                "expand": True,
+                "jit": False,
+                "compiler": "shell",
+                "jit_options": jit_options
+            }
+    s_opts = {
+                "max_iter": 25,
+                # "fixed_variable_treatment": "make_constraint",
+                # "hessian_approximation": "limited-memory",
+                # "mumps_mem_percent": 10000,
+                "print_level": 5
+            }
     opti.solver("ipopt", p_opts, s_opts) # set numerical backend
     opti.callback(lambda i: displayScene(opti.debug.value(var_xs[-1][:nq])))
 
@@ -303,14 +343,10 @@ def main():
         M1 = data.oMf[fixedFoot_ID]
         M2 = data.oMf[endEffector_ID]
         
-        pf1des.append(M1)
-        pf2des.append(M2)
+        pf1des.append(pin.SE3(M1.rotation, M1.translation))
+        pf2des.append(pin.SE3(M2.rotation, M2.translation))
         vf1des.append(vel1)
         vf2des.append(vel2)
-    # print(pf1des)
-    # print(pf2des)
-    # print(vf1des)
-    # print(vf2des)
     
     # while True:
     #     # displayScene(robot.q0, 1)
@@ -318,6 +354,14 @@ def main():
     #     xdes.reverse()
     #     displayTraj(xdes, DT)
     #     xdes.reverse()
+    
+    taudlog = []
+    epflog = []
+    evflog = []
+    taufflog = []
+    epjlog = []
+    evjlog = []
+    taulog = []
     
     unpause_physics_client(EmptyRequest())
     for t in range(T):
@@ -328,44 +372,56 @@ def main():
         al = ms.twist.angular
         xcb = np.hstack(([p.x, p.y, p.z, o.x, o.y, o.z, o.w], xc))
         vcb = np.hstack(([vl.x, vl.y, vl.z, al.x, al.y, al.z], vc))
-        # print(xcb)
-        # print(vcb)
 
         pin.forwardKinematics(model, data, xcb, vcb)
         pin.framesForwardKinematics(model, data, xcb)
         vel1 = pin.getFrameVelocity(model, data, fixedFoot_ID, pin.LOCAL)
         vel2 = pin.getFrameVelocity(model, data, endEffector_ID, pin.LOCAL)
-        # print(vel1.vector)
         
         J1 = pin.computeFrameJacobian(model, data, xcb, fixedFoot_ID, pin.LOCAL)
         J2 = pin.computeFrameJacobian(model, data, xcb, endEffector_ID, pin.LOCAL)
-        # print(J1)
-        # print(J2)
         
-        M1 = data.oMf[fixedFoot_ID]
-        M2 = data.oMf[endEffector_ID]
-        # print(M2)
-        # print(M2)
+        M1_ = data.oMf[fixedFoot_ID]
+        M2_ = data.oMf[endEffector_ID]
+        M1 = pin.SE3(M1_.rotation, M1_.translation)
+        M2 = pin.SE3(M2_.rotation, M2_.translation)
         
-        epf = np.hstack((pin.log(M1.inverse() * pf1des[t]).vector, pin.log(M2.inverse() * pf2des[t]).vector))
-        print(epf)
-        evf = np.hstack((vf1des[t] - vel1.vector, vf2des[t] - vel2.vector))
-        # print(evf)
+        epf = np.reshape(np.hstack((pin.log(M1.inverse() * pf1des[t]).vector, pin.log(M2.inverse() * pf2des[t]).vector)), (12, 1))
+        evf = np.reshape(np.hstack((vf1des[t] - vel1.vector, vf2des[t] - vel2.vector)), (12, 1))
         J1 = np.hstack((J1[:, 6:12], np.zeros((6,6))))
         J2 = np.hstack((np.zeros((6,6)), J2[:, 12:]))
         J = np.vstack((J1, J2))
-        # print(J)
-        tauff = np.reshape(taudes[t], (12, 1)) + np.matmul(J.transpose(), (np.reshape(Kp * epf, (12, 1)) + np.reshape(Kv * evf, (12, 1))))
-        print(tauff)
+        tauff = np.reshape(taudes[t], (12, 1)) + np.matmul(J.transpose(), np.matmul(Kp, epf) + np.matmul(Kv, evf))
 
         tstart = rospy.Time.now().to_sec()
         tnow = tstart
         while tnow < tstart + DT:
-            tau = tauff + Kpj * (np.reshape(xdes[t][7:], (12, 1)) - np.reshape(xc, (12, 1))) + Kvj * (np.reshape(vdes[t][6:], (12, 1)) - np.reshape(vc, (12, 1)))
-            # print(tau)
+            epj = np.reshape(xdes[t][7:], (12, 1)) - np.reshape(xc, (12, 1))
+            evj = np.reshape(vdes[t][6:], (12, 1)) - np.reshape(vc, (12, 1))
+            tau = tauff + np.matmul(Kpj, epj) + np.matmul(Kvj, evj)
             effortController.publish(Float64MultiArray(data=list(tau)))
             tnow = rospy.Time.now().to_sec()
+
+        epflog.append(np.linalg.norm(epf))
+        evflog.append(np.linalg.norm(evf))
+        epjlog.append(np.linalg.norm(epj))
+        evjlog.append(np.linalg.norm(evj))
+        # taulog.append(tau)
+        
     pause_physics_client(EmptyRequest())
+    
+    # tauarr = np.reshape(np.array(taulog), (12, T))
+    t = np.linspace(0, T-1, T)
+    plt.rc('lines', linewidth=2.5)
+    fig, ax = plt.subplots()
+
+    line1 = ax.plot(t, np.array(epflog), label='epf')
+    line2 = ax.plot(t, np.array(evflog), label='evf')
+    line3 = ax.plot(t, np.array(epjlog), label='epj')
+    line4 = ax.plot(t, np.array(evjlog), label='evj')
+
+    ax.legend(handlelength=4)
+    plt.show()
 
 if __name__ == '__main__':
     try:
