@@ -17,7 +17,7 @@ sensors) in Python. Supported platforms:
  - Sun Solaris
  - AIX
 
-Works with Python versions 2.7 and 3.4+.
+Works with Python versions 2.7 and 3.6+.
 """
 
 from __future__ import division
@@ -211,7 +211,7 @@ if hasattr(_psplatform.Process, "rlimit"):
 AF_LINK = _psplatform.AF_LINK
 
 __author__ = "Giampaolo Rodola'"
-__version__ = "5.9.5"
+__version__ = "5.9.6"
 version_info = tuple([int(num) for num in __version__.split('.')])
 
 _timer = getattr(time, 'monotonic', time.time)
@@ -227,8 +227,8 @@ _SENTINEL = object()
 # See: https://github.com/giampaolo/psutil/issues/564
 if (int(__version__.replace('.', '')) !=
         getattr(_psplatform.cext, 'version', None)):
-    msg = "version conflict: %r C extension module was built for another " \
-          "version of psutil" % _psplatform.cext.__file__
+    msg = "version conflict: %r C extension " % _psplatform.cext.__file__
+    msg += "module was built for another version of psutil"
     if hasattr(_psplatform.cext, 'version'):
         msg += " (%s instead of %s)" % (
             '.'.join([x for x in str(_psplatform.cext.version)]), __version__)
@@ -263,30 +263,11 @@ else:  # pragma: no cover
         return ret
 
 
-def _assert_pid_not_reused(fun):
-    """Decorator which raises NoSuchProcess in case a process is no
-    longer running or its PID has been reused.
-    """
-    @functools.wraps(fun)
-    def wrapper(self, *args, **kwargs):
-        if not self.is_running():
-            if self._pid_reused:
-                msg = "process no longer exists and its PID has been reused"
-            else:
-                msg = None
-            raise NoSuchProcess(self.pid, self._name, msg=msg)
-        return fun(self, *args, **kwargs)
-    return wrapper
-
-
 def _pprint_secs(secs):
     """Format seconds in a human readable form."""
     now = time.time()
     secs_ago = int(now - secs)
-    if secs_ago < 60 * 60 * 24:
-        fmt = "%H:%M:%S"
-    else:
-        fmt = "%Y-%m-%d %H:%M:%S"
+    fmt = "%H:%M:%S" if secs_ago < 60 * 60 * 24 else "%Y-%m-%d %H:%M:%S"
     return datetime.datetime.fromtimestamp(secs).strftime(fmt)
 
 
@@ -295,7 +276,7 @@ def _pprint_secs(secs):
 # =====================================================================
 
 
-class Process(object):
+class Process(object):  # noqa: UP004
     """Represents an OS process with the given PID.
     If PID is omitted current process PID (os.getpid()) is used.
     Raise NoSuchProcess if PID does not exist.
@@ -340,6 +321,14 @@ class Process(object):
             if pid < 0:
                 raise ValueError('pid must be a positive integer (got %s)'
                                  % pid)
+            try:
+                _psplatform.cext.check_pid_range(pid)
+            except OverflowError:
+                raise NoSuchProcess(
+                    pid,
+                    msg='process PID out of range (got %s)' % pid,
+                )
+
         self._pid = pid
         self._name = None
         self._exe = None
@@ -396,7 +385,7 @@ class Process(object):
                 pass
             if self._exitcode not in (_SENTINEL, None):
                 info["exitcode"] = self._exitcode
-            if self._create_time:
+            if self._create_time is not None:
                 info['started'] = _pprint_secs(self._create_time)
             return "%s.%s(%s)" % (
                 self.__class__.__module__,
@@ -410,6 +399,20 @@ class Process(object):
         # on PID and creation time.
         if not isinstance(other, Process):
             return NotImplemented
+        if OPENBSD or NETBSD:  # pragma: no cover
+            # Zombie processes on Open/NetBSD have a creation time of
+            # 0.0. This covers the case when a process started normally
+            # (so it has a ctime), then it turned into a zombie. It's
+            # important to do this because is_running() depends on
+            # __eq__.
+            pid1, ctime1 = self._ident
+            pid2, ctime2 = other._ident
+            if pid1 == pid2:
+                if ctime1 and not ctime2:
+                    try:
+                        return self.status() == STATUS_ZOMBIE
+                    except Error:
+                        pass
         return self._ident == other._ident
 
     def __ne__(self, other):
@@ -419,6 +422,18 @@ class Process(object):
         if self._hash is None:
             self._hash = hash(self._ident)
         return self._hash
+
+    def _raise_if_pid_reused(self):
+        """Raises NoSuchProcess in case process PID has been reused."""
+        if not self.is_running() and self._pid_reused:
+            # We may directly raise NSP in here already if PID is just
+            # not running, but I prefer NSP to be raised naturally by
+            # the actual Process API call. This way unit tests will tell
+            # us if the API is broken (aka don't raise NSP when it
+            # should). We also remain consistent with all other "get"
+            # APIs which don't use _raise_if_pid_reused().
+            msg = "process no longer exists and its PID has been reused"
+            raise NoSuchProcess(self.pid, self._name, msg=msg)
 
     @property
     def pid(self):
@@ -605,6 +620,7 @@ class Process(object):
 
         # XXX should we check creation time here rather than in
         # Process.parent()?
+        self._raise_if_pid_reused()
         if POSIX:
             return self._proc.ppid()
         else:  # pragma: no cover
@@ -728,8 +744,7 @@ class Process(object):
         if value is None:
             return self._proc.nice_get()
         else:
-            if not self.is_running():
-                raise NoSuchProcess(self.pid, self._name)
+            self._raise_if_pid_reused()
             self._proc.nice_set(value)
 
     if POSIX:
@@ -791,6 +806,7 @@ class Process(object):
                     raise ValueError("'ioclass' argument must be specified")
                 return self._proc.ionice_get()
             else:
+                self._raise_if_pid_reused()
                 return self._proc.ionice_set(ioclass, value)
 
     # Linux / FreeBSD only
@@ -806,6 +822,8 @@ class Process(object):
             See "man prlimit" for further info.
             Available on Linux and FreeBSD only.
             """
+            if limits is not None:
+                self._raise_if_pid_reused()
             return self._proc.rlimit(resource, limits)
 
     # Windows, Linux and FreeBSD only
@@ -822,6 +840,7 @@ class Process(object):
             if cpus is None:
                 return sorted(set(self._proc.cpu_affinity_get()))
             else:
+                self._raise_if_pid_reused()
                 if not cpus:
                     if hasattr(self._proc, "_get_eligible_cpus"):
                         cpus = self._proc._get_eligible_cpus()
@@ -847,7 +866,8 @@ class Process(object):
 
         def environ(self):
             """The environment variables of the process as a dict.  Note: this
-            might not reflect changes made after the process started.  """
+            might not reflect changes made after the process started.
+            """
             return self._proc.environ()
 
     if WINDOWS:
@@ -878,7 +898,6 @@ class Process(object):
             """
             return self._proc.threads()
 
-    @_assert_pid_not_reused
     def children(self, recursive=False):
         """Return the children of this process as a list of Process
         instances, pre-emptively checking whether PID has been reused.
@@ -905,6 +924,7 @@ class Process(object):
         process Y won't be listed as the reference to process A
         is lost.
         """
+        self._raise_if_pid_reused()
         ppid_map = _ppid_map()
         ret = []
         if not recursive:
@@ -1175,6 +1195,7 @@ class Process(object):
     if POSIX:
         def _send_signal(self, sig):
             assert not self.pid < 0, self.pid
+            self._raise_if_pid_reused()
             if self.pid == 0:
                 # see "man 2 kill"
                 raise ValueError(
@@ -1194,7 +1215,6 @@ class Process(object):
             except PermissionError:
                 raise AccessDenied(self.pid, self._name)
 
-    @_assert_pid_not_reused
     def send_signal(self, sig):
         """Send a signal *sig* to process pre-emptively checking
         whether PID has been reused (see signal module constants) .
@@ -1204,9 +1224,12 @@ class Process(object):
         if POSIX:
             self._send_signal(sig)
         else:  # pragma: no cover
+            self._raise_if_pid_reused()
+            if sig != signal.SIGTERM and not self.is_running():
+                msg = "process no longer exists"
+                raise NoSuchProcess(self.pid, self._name, msg=msg)
             self._proc.send_signal(sig)
 
-    @_assert_pid_not_reused
     def suspend(self):
         """Suspend process execution with SIGSTOP pre-emptively checking
         whether PID has been reused.
@@ -1215,9 +1238,9 @@ class Process(object):
         if POSIX:
             self._send_signal(signal.SIGSTOP)
         else:  # pragma: no cover
+            self._raise_if_pid_reused()
             self._proc.suspend()
 
-    @_assert_pid_not_reused
     def resume(self):
         """Resume process execution with SIGCONT pre-emptively checking
         whether PID has been reused.
@@ -1226,9 +1249,9 @@ class Process(object):
         if POSIX:
             self._send_signal(signal.SIGCONT)
         else:  # pragma: no cover
+            self._raise_if_pid_reused()
             self._proc.resume()
 
-    @_assert_pid_not_reused
     def terminate(self):
         """Terminate the process with SIGTERM pre-emptively checking
         whether PID has been reused.
@@ -1237,9 +1260,9 @@ class Process(object):
         if POSIX:
             self._send_signal(signal.SIGTERM)
         else:  # pragma: no cover
+            self._raise_if_pid_reused()
             self._proc.kill()
 
-    @_assert_pid_not_reused
     def kill(self):
         """Kill the current process with SIGKILL pre-emptively checking
         whether PID has been reused.
@@ -1247,6 +1270,7 @@ class Process(object):
         if POSIX:
             self._send_signal(signal.SIGKILL)
         else:  # pragma: no cover
+            self._raise_if_pid_reused()
             self._proc.kill()
 
     def wait(self, timeout=None):
@@ -1307,7 +1331,7 @@ class Popen(Process):
       >>> p.username()
       'giampaolo'
       >>> p.communicate()
-      ('hi\n', None)
+      ('hi', None)
       >>> p.terminate()
       >>> p.wait(timeout=2)
       0
@@ -1358,7 +1382,7 @@ class Popen(Process):
     def wait(self, timeout=None):
         if self.__subproc.returncode is not None:
             return self.__subproc.returncode
-        ret = super(Popen, self).wait(timeout)
+        ret = super(Popen, self).wait(timeout)  # noqa
         self.__subproc.returncode = ret
         return ret
 
@@ -1621,16 +1645,18 @@ def cpu_times(percpu=False):
 
 
 try:
-    _last_cpu_times = cpu_times()
+    _last_cpu_times = {threading.current_thread().ident: cpu_times()}
 except Exception:
     # Don't want to crash at import time.
-    _last_cpu_times = None
+    _last_cpu_times = {}
 
 try:
-    _last_per_cpu_times = cpu_times(percpu=True)
+    _last_per_cpu_times = {
+        threading.current_thread().ident: cpu_times(percpu=True)
+    }
 except Exception:
     # Don't want to crash at import time.
-    _last_per_cpu_times = None
+    _last_per_cpu_times = {}
 
 
 def _cpu_tot_time(times):
@@ -1724,8 +1750,7 @@ def cpu_percent(interval=None, percpu=False):
       2.9
       >>>
     """
-    global _last_cpu_times
-    global _last_per_cpu_times
+    tid = threading.current_thread().ident
     blocking = interval is not None and interval > 0.0
     if interval is not None and interval < 0:
         raise ValueError("interval is not positive (got %r)" % interval)
@@ -1748,14 +1773,9 @@ def cpu_percent(interval=None, percpu=False):
             t1 = cpu_times()
             time.sleep(interval)
         else:
-            t1 = _last_cpu_times
-            if t1 is None:
-                # Something bad happened at import time. We'll
-                # get a meaningful result on the next call. See:
-                # https://github.com/giampaolo/psutil/pull/715
-                t1 = cpu_times()
-        _last_cpu_times = cpu_times()
-        return calculate(t1, _last_cpu_times)
+            t1 = _last_cpu_times.get(tid) or cpu_times()
+        _last_cpu_times[tid] = cpu_times()
+        return calculate(t1, _last_cpu_times[tid])
     # per-cpu usage
     else:
         ret = []
@@ -1763,23 +1783,17 @@ def cpu_percent(interval=None, percpu=False):
             tot1 = cpu_times(percpu=True)
             time.sleep(interval)
         else:
-            tot1 = _last_per_cpu_times
-            if tot1 is None:
-                # Something bad happened at import time. We'll
-                # get a meaningful result on the next call. See:
-                # https://github.com/giampaolo/psutil/pull/715
-                tot1 = cpu_times(percpu=True)
-        _last_per_cpu_times = cpu_times(percpu=True)
-        for t1, t2 in zip(tot1, _last_per_cpu_times):
+            tot1 = _last_per_cpu_times.get(tid) or cpu_times(percpu=True)
+        _last_per_cpu_times[tid] = cpu_times(percpu=True)
+        for t1, t2 in zip(tot1, _last_per_cpu_times[tid]):
             ret.append(calculate(t1, t2))
         return ret
 
 
-# Use separate global vars for cpu_times_percent() so that it's
-# independent from cpu_percent() and they can both be used within
-# the same program.
-_last_cpu_times_2 = _last_cpu_times
-_last_per_cpu_times_2 = _last_per_cpu_times
+# Use a separate dict for cpu_times_percent(), so it's independent from
+# cpu_percent() and they can both be used within the same program.
+_last_cpu_times_2 = _last_cpu_times.copy()
+_last_per_cpu_times_2 = _last_per_cpu_times.copy()
 
 
 def cpu_times_percent(interval=None, percpu=False):
@@ -1795,8 +1809,7 @@ def cpu_times_percent(interval=None, percpu=False):
     *interval* and *percpu* arguments have the same meaning as in
     cpu_percent().
     """
-    global _last_cpu_times_2
-    global _last_per_cpu_times_2
+    tid = threading.current_thread().ident
     blocking = interval is not None and interval > 0.0
     if interval is not None and interval < 0:
         raise ValueError("interval is not positive (got %r)" % interval)
@@ -1824,14 +1837,9 @@ def cpu_times_percent(interval=None, percpu=False):
             t1 = cpu_times()
             time.sleep(interval)
         else:
-            t1 = _last_cpu_times_2
-            if t1 is None:
-                # Something bad happened at import time. We'll
-                # get a meaningful result on the next call. See:
-                # https://github.com/giampaolo/psutil/pull/715
-                t1 = cpu_times()
-        _last_cpu_times_2 = cpu_times()
-        return calculate(t1, _last_cpu_times_2)
+            t1 = _last_cpu_times_2.get(tid) or cpu_times()
+        _last_cpu_times_2[tid] = cpu_times()
+        return calculate(t1, _last_cpu_times_2[tid])
     # per-cpu usage
     else:
         ret = []
@@ -1839,14 +1847,9 @@ def cpu_times_percent(interval=None, percpu=False):
             tot1 = cpu_times(percpu=True)
             time.sleep(interval)
         else:
-            tot1 = _last_per_cpu_times_2
-            if tot1 is None:
-                # Something bad happened at import time. We'll
-                # get a meaningful result on the next call. See:
-                # https://github.com/giampaolo/psutil/pull/715
-                tot1 = cpu_times(percpu=True)
-        _last_per_cpu_times_2 = cpu_times(percpu=True)
-        for t1, t2 in zip(tot1, _last_per_cpu_times_2):
+            tot1 = _last_per_cpu_times_2.get(tid) or cpu_times(percpu=True)
+        _last_per_cpu_times_2[tid] = cpu_times(percpu=True)
+        for t1, t2 in zip(tot1, _last_per_cpu_times_2[tid]):
             ret.append(calculate(t1, t2))
         return ret
 
@@ -2113,7 +2116,7 @@ def net_io_counters(pernic=False, nowrap=True):
     and wrap (restart from 0) and add "old value" to "new value" so that
     the returned numbers will always be increasing or remain the same,
     but never decrease.
-    "disk_io_counters.cache_clear()" can be used to invalidate the
+    "net_io_counters.cache_clear()" can be used to invalidate the
     cache.
     """
     rawdict = _psplatform.net_io_counters()
@@ -2181,7 +2184,7 @@ def net_if_addrs():
     Note: you can have more than one address of the same family
     associated with each interface.
     """
-    has_enums = sys.version_info >= (3, 4)
+    has_enums = _PY3
     if has_enums:
         import socket
     rawlist = _psplatform.net_if_addrs()
@@ -2195,7 +2198,7 @@ def net_if_addrs():
                 if WINDOWS and fam == -1:
                     fam = _psplatform.AF_LINK
                 elif (hasattr(_psplatform, "AF_LINK") and
-                        _psplatform.AF_LINK == fam):
+                        fam == _psplatform.AF_LINK):
                     # Linux defines AF_LINK as an alias for AF_PACKET.
                     # We re-set the family here so that repr(family)
                     # will show AF_LINK rather than AF_PACKET
@@ -2420,7 +2423,7 @@ def test():  # pragma: no cover
 
 del memoize_when_activated, division
 if sys.version_info[0] < 3:
-    del num, x
+    del num, x  # noqa
 
 if __name__ == "__main__":
     test()

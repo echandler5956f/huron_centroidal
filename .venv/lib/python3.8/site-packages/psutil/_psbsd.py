@@ -8,9 +8,9 @@ import contextlib
 import errno
 import functools
 import os
-import xml.etree.ElementTree as ET
 from collections import defaultdict
 from collections import namedtuple
+from xml.etree import ElementTree
 
 from . import _common
 from . import _psposix
@@ -24,6 +24,7 @@ from ._common import NoSuchProcess
 from ._common import ZombieProcess
 from ._common import conn_tmap
 from ._common import conn_to_ntuple
+from ._common import debug
 from ._common import memoize
 from ._common import memoize_when_activated
 from ._common import usage_percent
@@ -225,14 +226,14 @@ def swap_memory():
 
 
 def cpu_times():
-    """Return system per-CPU times as a namedtuple"""
+    """Return system per-CPU times as a namedtuple."""
     user, nice, system, idle, irq = cext.cpu_times()
     return scputimes(user, nice, system, idle, irq)
 
 
 if HAS_PER_CPU_TIMES:
     def per_cpu_times():
-        """Return system CPU times as a namedtuple"""
+        """Return system CPU times as a namedtuple."""
         ret = []
         for cpu_t in cext.per_cpu_times():
             user, nice, system, idle, irq = cpu_t
@@ -248,7 +249,7 @@ else:
     # crash at psutil import time.
     # Next calls will fail with NotImplementedError
     def per_cpu_times():
-        """Return system CPU times as a namedtuple"""
+        """Return system CPU times as a namedtuple."""
         if cpu_count_logical() == 1:
             return [cpu_times()]
         if per_cpu_times.__called__:
@@ -283,7 +284,7 @@ else:
             index = s.rfind("</groups>")
             if index != -1:
                 s = s[:index + 9]
-                root = ET.fromstring(s)
+                root = ElementTree.fromstring(s)
                 try:
                     ret = len(root.findall('group/children/group/cpu')) or None
                 finally:
@@ -364,7 +365,7 @@ elif OPENBSD:
 def disk_partitions(all=False):
     """Return mounted disk partitions as a list of namedtuples.
     'all' argument is ignored, see:
-    https://github.com/giampaolo/psutil/issues/906
+    https://github.com/giampaolo/psutil/issues/906.
     """
     retlist = []
     partitions = cext.disk_partitions()
@@ -552,7 +553,7 @@ def is_zombie(pid):
     try:
         st = cext.proc_oneshot_info(pid)[kinfo_proc_map['status']]
         return PROC_STATUSES.get(st) == _common.STATUS_ZOMBIE
-    except Exception:
+    except OSError:
         return False
 
 
@@ -598,7 +599,7 @@ def wrap_exceptions_procfs(inst):
         raise AccessDenied(inst.pid, inst._name)
 
 
-class Process(object):
+class Process:
     """Wrapper class around underlying C implementation."""
 
     __slots__ = ["pid", "_name", "_ppid", "_cache"]
@@ -662,10 +663,10 @@ class Process(object):
         if OPENBSD and self.pid == 0:
             return []  # ...else it crashes
         elif NETBSD:
-            # XXX - most of the times the underlying sysctl() call on Net
-            # and Open BSD returns a truncated string.
-            # Also /proc/pid/cmdline behaves the same so it looks
-            # like this is a kernel bug.
+            # XXX - most of the times the underlying sysctl() call on
+            # NetBSD and OpenBSD returns a truncated string. Also
+            # /proc/pid/cmdline behaves the same so it looks like this
+            # is a kernel bug.
             try:
                 return cext.proc_cmdline(self.pid)
             except OSError as err:
@@ -677,6 +678,7 @@ class Process(object):
                     else:
                         # XXX: this happens with unicode tests. It means the C
                         # routine is unable to decode invalid unicode chars.
+                        debug("ignoring %r and returning an empty list" % err)
                         return []
                 else:
                     raise

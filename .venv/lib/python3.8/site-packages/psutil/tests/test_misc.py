@@ -5,9 +5,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""
-Miscellaneous tests.
-"""
+"""Miscellaneous tests."""
 
 import ast
 import collections
@@ -59,6 +57,12 @@ from psutil.tests import sh
 
 
 class TestSpecialMethods(PsutilTestCase):
+
+    def test_check_pid_range(self):
+        with self.assertRaises(OverflowError):
+            psutil._psplatform.cext.check_pid_range(2 ** 128)
+        with self.assertRaises(psutil.NoSuchProcess):
+            psutil.Process(2 ** 128)
 
     def test_process__repr__(self, func=repr):
         p = psutil.Process(self.spawn_testproc().pid)
@@ -325,12 +329,12 @@ class TestMemoizeDecorator(PsutilTestCase):
             self.assertEqual(ret, expected_retval)
         self.assertEqual(len(self.calls), 4)
         # docstring
-        self.assertEqual(obj.__doc__, "my docstring")
+        self.assertEqual(obj.__doc__, "My docstring.")
 
     def test_function(self):
         @memoize
         def foo(*args, **kwargs):
-            """my docstring"""
+            """My docstring."""
             baseclass.calls.append((args, kwargs))
             return 22
 
@@ -340,7 +344,7 @@ class TestMemoizeDecorator(PsutilTestCase):
     def test_class(self):
         @memoize
         class Foo:
-            """my docstring"""
+            """My docstring."""
 
             def __init__(self, *args, **kwargs):
                 baseclass.calls.append((args, kwargs))
@@ -370,7 +374,7 @@ class TestMemoizeDecorator(PsutilTestCase):
             @staticmethod
             @memoize
             def bar(*args, **kwargs):
-                """my docstring"""
+                """My docstring."""
                 baseclass.calls.append((args, kwargs))
                 return 22
 
@@ -382,7 +386,7 @@ class TestMemoizeDecorator(PsutilTestCase):
             @classmethod
             @memoize
             def bar(cls, *args, **kwargs):
-                """my docstring"""
+                """My docstring."""
                 baseclass.calls.append((args, kwargs))
                 return 22
 
@@ -394,7 +398,7 @@ class TestMemoizeDecorator(PsutilTestCase):
         # against different types. Keeping it anyway.
         @memoize
         def foo(*args, **kwargs):
-            """foo docstring"""
+            """Foo docstring."""
             calls.append(None)
             return (args, kwargs)
 
@@ -424,7 +428,7 @@ class TestMemoizeDecorator(PsutilTestCase):
         self.assertEqual(ret, expected)
         self.assertEqual(len(calls), 4)
         # docstring
-        self.assertEqual(foo.__doc__, "foo docstring")
+        self.assertEqual(foo.__doc__, "Foo docstring.")
 
 
 class TestCommonModule(PsutilTestCase):
@@ -557,7 +561,7 @@ class TestCommonModule(PsutilTestCase):
 
     def test_cat_bcat(self):
         testfn = self.get_testfn()
-        with open(testfn, "wt") as f:
+        with open(testfn, "w") as f:
             f.write("foo")
         self.assertEqual(cat(testfn), "foo")
         self.assertEqual(bcat(testfn), b"foo")
@@ -839,11 +843,7 @@ class TestScripts(PsutilTestCase):
     @staticmethod
     def assert_syntax(exe):
         exe = os.path.join(SCRIPTS_DIR, exe)
-        if PY3:
-            f = open(exe, 'rt', encoding='utf8')
-        else:
-            f = open(exe, 'rt')
-        with f:
+        with open(exe, encoding="utf8") if PY3 else open(exe) as f:
             src = f.read()
         ast.parse(src)
 

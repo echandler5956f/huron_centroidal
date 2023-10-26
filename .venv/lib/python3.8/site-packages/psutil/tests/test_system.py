@@ -30,6 +30,7 @@ from psutil import OPENBSD
 from psutil import POSIX
 from psutil import SUNOS
 from psutil import WINDOWS
+from psutil._compat import PY3
 from psutil._compat import FileNotFoundError
 from psutil._compat import long
 from psutil.tests import ASCII_FS
@@ -70,6 +71,11 @@ class TestProcessAPIs(PsutilTestCase):
         p.kill()
         p.wait()
         self.assertNotIn(sproc.pid, [x.pid for x in psutil.process_iter()])
+
+        # assert there are no duplicates
+        ls = [x for x in psutil.process_iter()]
+        self.assertEqual(sorted(ls, key=lambda x: x.pid),
+                         sorted(set(ls), key=lambda x: x.pid))
 
         with mock.patch('psutil.Process',
                         side_effect=psutil.NoSuchProcess(os.getpid())):
@@ -210,8 +216,8 @@ class TestMiscAPIs(PsutilTestCase):
             self.assertIsInstance(user.terminal, (str, type(None)))
             if user.host is not None:
                 self.assertIsInstance(user.host, (str, type(None)))
-            user.terminal
-            user.host
+            user.terminal  # noqa
+            user.host  # noqa
             assert user.started > 0.0, user
             datetime.datetime.fromtimestamp(user.started)
             if WINDOWS or OPENBSD:
@@ -263,7 +269,7 @@ class TestMiscAPIs(PsutilTestCase):
 
         # assert all other constants are set to False
         for name in names:
-            self.assertIs(getattr(psutil, name), False, msg=name)
+            self.assertFalse(getattr(psutil, name), msg=name)
 
 
 class TestMemoryAPIs(PsutilTestCase):
@@ -349,7 +355,7 @@ class TestCpuAPIs(PsutilTestCase):
             self.assertIsInstance(cp_time, float)
             self.assertGreaterEqual(cp_time, 0.0)
             total += cp_time
-        self.assertEqual(total, sum(times))
+        self.assertAlmostEqual(total, sum(times))
         str(times)
         # CPU times are always supposed to increase over time
         # or at least remain the same and that's because time
@@ -388,7 +394,7 @@ class TestCpuAPIs(PsutilTestCase):
                 self.assertIsInstance(cp_time, float)
                 self.assertGreaterEqual(cp_time, 0.0)
                 total += cp_time
-            self.assertEqual(total, sum(times))
+            self.assertAlmostEqual(total, sum(times))
             str(times)
         self.assertEqual(len(psutil.cpu_times(percpu=True)[0]),
                          len(psutil.cpu_times(percpu=False)))
@@ -611,7 +617,7 @@ class TestDiskAPIs(PsutilTestCase):
             else:
                 # we cannot make any assumption about this, see:
                 # http://goo.gl/p9c43
-                disk.device
+                disk.device  # noqa
             # on modern systems mount points can also be files
             assert os.path.exists(disk.mountpoint), disk
             assert disk.fstype, disk
@@ -751,7 +757,7 @@ class TestNetAPIs(PsutilTestCase):
                 self.assertIsInstance(addr.netmask, (str, type(None)))
                 self.assertIsInstance(addr.broadcast, (str, type(None)))
                 self.assertIn(addr.family, families)
-                if sys.version_info >= (3, 4) and not PYPY:
+                if PY3 and not PYPY:
                     self.assertIsInstance(addr.family, enum.IntEnum)
                 if nic_stats[nic].isup:
                     # Do not test binding to addresses of interfaces

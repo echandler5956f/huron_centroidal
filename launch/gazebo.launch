@@ -2,7 +2,7 @@
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="world_name" value="$(find huron_description)/worlds/multiview.world"/>
     <arg name="use_sim_time" value="true"/>
-    <arg name="paused" value="false"/>
+    <arg name="paused" value="true"/>
   </include>
 
   <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find huron_description)/urdf/huron.xacro'" />
@@ -39,7 +39,7 @@
     name="spawn_model"
     pkg="gazebo_ros"
     type="spawn_model"
-    args="-urdf -param robot_description -model huron -x 0.0 -y 0.0 -z 1.0627"
+    args="-urdf -param robot_description -model huron -x 0.0 -y 0.0 -z 1.1227"
     respawn="false" output="screen" />
 
   <!-- <node

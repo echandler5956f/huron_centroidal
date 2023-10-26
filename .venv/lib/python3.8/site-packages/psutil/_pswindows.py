@@ -56,7 +56,7 @@ except ImportError as err:
     else:
         raise
 
-if sys.version_info >= (3, 4):
+if PY3:
     import enum
 else:
     enum = None
@@ -195,7 +195,7 @@ def convert_dos_path(s):
     r"""Convert paths using native DOS format like:
         "\Device\HarddiskVolume1\Windows\systemew\file.txt"
     into:
-        "C:\Windows\systemew\file.txt"
+        "C:\Windows\systemew\file.txt".
     """
     rawdrive = '\\'.join(s.split('\\')[:3])
     driveletter = cext.QueryDosDevice(rawdrive)
@@ -247,7 +247,7 @@ def swap_memory():
     total_system = mem[2]
 
     # system memory (commit total/limit) is the sum of physical and swap
-    # thus physical memory values need to be substracted to get swap values
+    # thus physical memory values need to be subtracted to get swap values
     total = total_system - total_phys
     # commit total is incremented immediately (decrementing free_system)
     # while the corresponding free physical value is not decremented until
@@ -257,7 +257,9 @@ def swap_memory():
         percentswap = cext.swap_percent()
         used = int(0.01 * percentswap * total)
     else:
+        percentswap = 0.0
         used = 0
+
     free = total - used
     percent = round(percentswap, 1)
     return _common.sswap(total, used, free, percent, 0, 0)
@@ -346,7 +348,8 @@ _loadavg_inititialized = False
 
 def getloadavg():
     """Return the number of processes in the system run queue averaged
-    over the last 1, 5, and 15 minutes respectively as a tuple"""
+    over the last 1, 5, and 15 minutes respectively as a tuple.
+    """
     global _loadavg_inititialized
 
     if not _loadavg_inititialized:
@@ -491,7 +494,7 @@ def win_service_get(name):
     return service
 
 
-class WindowsService(object):
+class WindowsService:
     """Represents an installed Windows service."""
 
     def __init__(self, name, display_name):
@@ -699,7 +702,7 @@ def wrap_exceptions(fun):
 
 def retry_error_partial_copy(fun):
     """Workaround for https://github.com/giampaolo/psutil/issues/875.
-    See: https://stackoverflow.com/questions/4457745#4457745
+    See: https://stackoverflow.com/questions/4457745#4457745.
     """
     @functools.wraps(fun)
     def wrapper(self, *args, **kwargs):
@@ -717,13 +720,15 @@ def retry_error_partial_copy(fun):
                 else:
                     raise
         else:
-            msg = "%s retried %s times, converted to AccessDenied as it's " \
-                "still returning %r" % (fun, times, err)
+            msg = (
+                "{} retried {} times, converted to AccessDenied as it's "
+                "still returning {}".format(fun, times, err)
+            )
             raise AccessDenied(pid=self.pid, name=self._name, msg=msg)
     return wrapper
 
 
-class Process(object):
+class Process:
     """Wrapper class around underlying C implementation."""
 
     __slots__ = ["pid", "_name", "_ppid", "_cache"]
@@ -849,7 +854,7 @@ class Process(object):
         t = self._get_raw_meminfo()
         rss = t[2]  # wset
         vms = t[7]  # pagefile
-        return pmem(*(rss, vms, ) + t)
+        return pmem(*(rss, vms) + t)
 
     @wrap_exceptions
     def memory_full_info(self):

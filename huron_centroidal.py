@@ -1,4 +1,4 @@
-#!/home/quant/ros/ocs2_ws/src/huron_centroidal/.venv/bin/python3
+#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
 import rospy
 from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import JointState
@@ -55,8 +55,8 @@ def main():
     # --- Load robot model
     builder = RobotWrapper.BuildFromURDF
     robot = builder(
-                    "/home/quant/ros/ocs2_ws/src/HURON-Model/huron_description/urdf/huron_cheat.urdf",
-                    ["/home/quant/ros/ocs2_ws/src/HURON-Model/huron_description"],
+                    "/home/quant/ros_ws/src/HURON-Model/huron_description/urdf/huron_cheat.urdf",
+                    ["/home/quant/ros_ws/src/HURON-Model/huron_description"],
                     None,
                 )
     robot.q0 = np.array([0, 0, 1.0627, 0, 0, 0, 1,

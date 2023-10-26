@@ -1,4 +1,5 @@
-#!/home/quant/ros/ocs2_ws/src/huron_centroidal/.venv/bin/python3
+#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
+
 import rospy
 from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import JointState
@@ -29,17 +30,17 @@ def joint_callback(data):
 def main():
     global xc, vc, tauc
 
-    rospy.wait_for_service('/gazebo/unpause_physics')
-    rospy.wait_for_service('/gazebo/pause_physics')
-    rospy.wait_for_service('gazebo/get_model_state')
-    unpause_physics_client = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
-    pause_physics_client = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
-    get_model_state_client = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
+    # rospy.wait_for_service('/gazebo/unpause_physics')
+    # rospy.wait_for_service('/gazebo/pause_physics')
+    # rospy.wait_for_service('gazebo/get_model_state')
+    # unpause_physics_client = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
+    # pause_physics_client = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
+    # get_model_state_client = rospy.ServiceProxy('/gazebo/get_model_state', GetModelState)
 
-    effortController = rospy.Publisher('/huron/joint_group_effort_controller/command', Float64MultiArray, queue_size=100)
-    rospy.Subscriber("/huron/joint_states", JointState, joint_callback, queue_size=100)
+    # effortController = rospy.Publisher('/huron/joint_group_effort_controller/command', Float64MultiArray, queue_size=100)
+    # rospy.Subscriber("/huron/joint_states", JointState, joint_callback, queue_size=100)
 
-    rospy.init_node('huron_centroidal', anonymous=True)
+    # rospy.init_node('huron_centroidal', anonymous=True)
 
     # Change numerical print
     pin.SE3.__repr__ = pin.SE3.__str__
@@ -87,8 +88,8 @@ def main():
     # --- Load robot model
     builder = RobotWrapper.BuildFromURDF
     robot = builder(
-                    "/home/quant/ros/ocs2_ws/src/HURON-Model/huron_description/urdf/huron_cheat.urdf",
-                    ["/home/quant/ros/ocs2_ws/src/HURON-Model/huron_description"],
+                    "/home/quant/ros_ws/src/HURON-Model/huron_description/urdf/huron_cheat.urdf",
+                    ["/home/quant/ros_ws/src/HURON-Model/huron_description"],
                     None,
                 )
     robot.q0 = np.array([0, 0, 1.0627, 0, 0, 0, 1,
@@ -275,7 +276,7 @@ def main():
         totalcost += 1e-4 * DT * casadi.sumsqr(var_as[t])
     # for t in range(T):
     #     totalcost += 1e-4 * DT * casadi.sumsqr(var_us[t])
-    totalcost += 1e4 * casadi.sumsqr(error_tool(var_xs[T]))
+    totalcost += 1e5 * casadi.sumsqr(error_tool(var_xs[T]))
 
     opti.subject_to(var_xs[0][:nq] == robot.q0)
     opti.subject_to(var_xs[0][nq:] == 0)  # zero initial velocity
@@ -283,14 +284,20 @@ def main():
 
     # Define the integration constraints
     for t in range(T):
-        tau = casadi.vertcat(np.zeros(6), var_us[t])
-        opti.subject_to(caba(var_xs[t], tau) == var_as[t])
+        # tau = casadi.vertcat(np.zeros(6), var_us[t])
+        # opti.subject_to(caba(var_xs[t], tau) == var_as[t])
         opti.subject_to(cnext(var_xs[t], var_as[t]) == var_xs[t + 1])
+
+
+    f0 = casadi.Function('f', [cx, ctauq, caq], [caba(cx, ctauq) - caq])
+    fMap = f0.map(T, "thread", 20)
+    opti.subject_to(fMap(casadi.horzcat(*[var_xs[t] for t in range(T)]), casadi.horzcat(*[casadi.vertcat(np.zeros(6), var_us[t]) for t in range(T)]), casadi.horzcat(*[var_as[t] for t in range(T)])) == 0)
+    # opti.subject_to(fMap(opti.variable(nx, T), opti.variable(nv, T), opti.variable(nv, T)) == 0)
     
-    for t in range(T):
-        for c in contacts:
-            correction = cbaumgart[c.name](var_xs[t])
-            opti.subject_to(acontacts[c.name](var_xs[t], var_as[t]) == -correction)
+    # for t in range(T):
+    #     for c in contacts:
+    #         correction = cbaumgart[c.name](var_xs[t])
+    #         opti.subject_to(acontacts[c.name](var_xs[t], var_as[t]) == -correction)
     ### SOLVE
     opti.minimize(totalcost)
     jit_options = {
@@ -298,18 +305,37 @@ def main():
                 }
     p_opts = {
                 "expand": True,
-                "jit": False,
-                "compiler": "shell",
-                "jit_options": jit_options
+                # "jit": False,
+                # "compiler": "shell",
+                # "jit_options": jit_options
+                "snopt": {
+                    "Iterations limit": 1250,
+                    # "Partial price": 10,
+                    # "Scale option": 2,
+                    # "Hessian": "full memory"
+                    # "Total character workspace": 100000000,
+                    # "Total integer workspace": 1520842,
+                    # "Total real workspace": 100000000,
+                    # "User character workspace": 500,
+                    # "User integer workspace": 0
+                    # "User real workspace": 500
+                    # "max_iter": 25,
+                    # "fixed_variable_treatment": "make_constraint",
+                    # "hessian_approximation": "limited-memory",
+                    # "mumps_mem_percent": 10000,
+                    # "print_level": 5
+                }
             }
     s_opts = {
-                "max_iter": 25,
+                "User integer workspace": 0,
+                "User real workspace": 0
+                # "max_iter": 25,
                 # "fixed_variable_treatment": "make_constraint",
                 # "hessian_approximation": "limited-memory",
                 # "mumps_mem_percent": 10000,
-                "print_level": 5
+                # "print_level": 5
             }
-    opti.solver("ipopt", p_opts, s_opts) # set numerical backend
+    opti.solver("snopt", p_opts) # set numerical backend
     opti.callback(lambda i: displayScene(opti.debug.value(var_xs[-1][:nq])))
 
     # Caution: in case the solver does not converge, we are picking the candidate values
@@ -348,12 +374,12 @@ def main():
         vf1des.append(vel1)
         vf2des.append(vel2)
     
-    # while True:
-    #     # displayScene(robot.q0, 1)
-    #     displayTraj(xdes, DT)
-    #     xdes.reverse()
-    #     displayTraj(xdes, DT)
-    #     xdes.reverse()
+    while True:
+        displayScene(robot.q0, 1)
+        displayTraj(xdes, DT)
+        xdes.reverse()
+        displayTraj(xdes, DT)
+        xdes.reverse()
     
     taudlog = []
     epflog = []

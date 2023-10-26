@@ -113,7 +113,7 @@ def get_ipv4_broadcast(ifname):
 
 
 def get_ipv6_addresses(ifname):
-    with open("/proc/net/if_inet6", 'rt') as f:
+    with open("/proc/net/if_inet6") as f:
         all_fields = []
         for line in f.readlines():
             fields = line.split()
@@ -123,7 +123,7 @@ def get_ipv6_addresses(ifname):
         if len(all_fields) == 0:
             raise ValueError("could not find interface %r" % ifname)
 
-    for i in range(0, len(all_fields)):
+    for i in range(len(all_fields)):
         unformatted = all_fields[i][0]
         groups = []
         for j in range(0, len(unformatted), 4):
@@ -180,7 +180,7 @@ def free_physmem():
     for line in lines:
         if line.startswith('Mem'):
             total, used, free, shared = \
-                [int(x) for x in line.split()[1:5]]
+                (int(x) for x in line.split()[1:5])
             nt = collections.namedtuple(
                 'free', 'total used free shared output')
             return nt(total, used, free, shared, out)
@@ -943,7 +943,7 @@ class TestLoadAvg(PsutilTestCase):
     @unittest.skipIf(not HAS_GETLOADAVG, "not supported")
     def test_getloadavg(self):
         psutil_value = psutil.getloadavg()
-        with open("/proc/loadavg", "r") as f:
+        with open("/proc/loadavg") as f:
             proc_value = f.read().split()
 
         self.assertAlmostEqual(float(proc_value[0]), psutil_value[0], delta=1)
@@ -1015,7 +1015,7 @@ class TestSystemNetIfStats(PsutilTestCase):
 
     def test_mtu(self):
         for name, stats in psutil.net_if_stats().items():
-            with open("/sys/class/net/%s/mtu" % name, "rt") as f:
+            with open("/sys/class/net/%s/mtu" % name) as f:
                 self.assertEqual(stats.mtu, int(f.read().strip()))
 
     @unittest.skipIf(not which("ifconfig"), "ifconfig utility not available")
@@ -1159,7 +1159,7 @@ class TestSystemDiskPartitions(PsutilTestCase):
 
     def test_zfs_fs(self):
         # Test that ZFS partitions are returned.
-        with open("/proc/filesystems", "r") as f:
+        with open("/proc/filesystems") as f:
             data = f.read()
         if 'zfs' in data:
             for part in psutil.disk_partitions():
@@ -1597,7 +1597,7 @@ class TestSensorsBattery(PsutilTestCase):
     def test_emulate_power_plugged(self):
         # Pretend the AC power cable is connected.
         def open_mock(name, *args, **kwargs):
-            if name.endswith("AC0/online") or name.endswith("AC/online"):
+            if name.endswith(('AC0/online', 'AC/online')):
                 return io.BytesIO(b"1")
             else:
                 return orig_open(name, *args, **kwargs)
@@ -1614,7 +1614,7 @@ class TestSensorsBattery(PsutilTestCase):
         # Same as above but pretend /AC0/online does not exist in which
         # case code relies on /status file.
         def open_mock(name, *args, **kwargs):
-            if name.endswith("AC0/online") or name.endswith("AC/online"):
+            if name.endswith(('AC0/online', 'AC/online')):
                 raise IOError(errno.ENOENT, "")
             elif name.endswith("/status"):
                 return io.StringIO(u("charging"))
@@ -1630,7 +1630,7 @@ class TestSensorsBattery(PsutilTestCase):
     def test_emulate_power_not_plugged(self):
         # Pretend the AC power cable is not connected.
         def open_mock(name, *args, **kwargs):
-            if name.endswith("AC0/online") or name.endswith("AC/online"):
+            if name.endswith(('AC0/online', 'AC/online')):
                 return io.BytesIO(b"0")
             else:
                 return orig_open(name, *args, **kwargs)
@@ -1645,7 +1645,7 @@ class TestSensorsBattery(PsutilTestCase):
         # Same as above but pretend /AC0/online does not exist in which
         # case code relies on /status file.
         def open_mock(name, *args, **kwargs):
-            if name.endswith("AC0/online") or name.endswith("AC/online"):
+            if name.endswith(('AC0/online', 'AC/online')):
                 raise IOError(errno.ENOENT, "")
             elif name.endswith("/status"):
                 return io.StringIO(u("discharging"))
@@ -1662,8 +1662,10 @@ class TestSensorsBattery(PsutilTestCase):
         # Pretend we can't know whether the AC power cable not
         # connected (assert fallback to False).
         def open_mock(name, *args, **kwargs):
-            if name.startswith("/sys/class/power_supply/AC0/online") or \
-                    name.startswith("/sys/class/power_supply/AC/online"):
+            if name.startswith(
+                ('/sys/class/power_supply/AC0/online',
+                 '/sys/class/power_supply/AC/online')
+            ):
                 raise IOError(errno.ENOENT, "")
             elif name.startswith("/sys/class/power_supply/BAT0/status"):
                 return io.BytesIO(b"???")
@@ -1777,7 +1779,7 @@ class TestSensorsTemperatures(PsutilTestCase):
                 return orig_open(name, *args, **kwargs)
 
         def glob_mock(path):
-            if path == '/sys/class/hwmon/hwmon*/temp*_*':
+            if path == '/sys/class/hwmon/hwmon*/temp*_*':  # noqa
                 return []
             elif path == '/sys/class/hwmon/hwmon*/device/temp*_*':
                 return []
@@ -1896,7 +1898,7 @@ class TestProcess(PsutilTestCase):
         testfn = self.get_testfn()
         with open(testfn, "w"):
             self.assertEqual(get_test_file(testfn).mode, "w")
-        with open(testfn, "r"):
+        with open(testfn):
             self.assertEqual(get_test_file(testfn).mode, "r")
         with open(testfn, "a"):
             self.assertEqual(get_test_file(testfn).mode, "a")
@@ -2060,24 +2062,10 @@ class TestProcess(PsutilTestCase):
 
     def test_exe_mocked(self):
         with mock.patch('psutil._pslinux.readlink',
-                        side_effect=OSError(errno.ENOENT, "")) as m1:
-            with mock.patch('psutil.Process.cmdline',
-                            side_effect=psutil.AccessDenied(0, "")) as m2:
-                # No such file error; might be raised also if /proc/pid/exe
-                # path actually exists for system processes with low pids
-                # (about 0-20). In this case psutil is supposed to return
-                # an empty string.
-                ret = psutil.Process().exe()
-                assert m1.called
-                assert m2.called
-                self.assertEqual(ret, "")
-
-                # ...but if /proc/pid no longer exist we're supposed to treat
-                # it as an alias for zombie process
-                with mock.patch('psutil._pslinux.os.path.lexists',
-                                return_value=False):
-                    self.assertRaises(
-                        psutil.ZombieProcess, psutil.Process().exe)
+                        side_effect=OSError(errno.ENOENT, "")) as m:
+            ret = psutil.Process().exe()
+            assert m.called
+            self.assertEqual(ret, "")
 
     def test_issue_1014(self):
         # Emulates a case where smaps file does not exist. In this case
@@ -2096,23 +2084,15 @@ class TestProcess(PsutilTestCase):
         # happen in case of zombie process:
         # https://travis-ci.org/giampaolo/psutil/jobs/51368273
         with mock.patch("psutil._pslinux.prlimit",
-                        side_effect=OSError(errno.ENOSYS, "")) as m:
-            p = psutil.Process()
-            p.name()
-            with self.assertRaises(psutil.ZombieProcess) as exc:
-                p.rlimit(psutil.RLIMIT_NOFILE)
-            assert m.called
-        self.assertEqual(exc.exception.pid, p.pid)
-        self.assertEqual(exc.exception.name, p.name())
-
-    def test_cwd_zombie(self):
-        with mock.patch("psutil._pslinux.os.readlink",
-                        side_effect=OSError(errno.ENOENT, "")) as m:
-            p = psutil.Process()
-            p.name()
-            with self.assertRaises(psutil.ZombieProcess) as exc:
-                p.cwd()
-            assert m.called
+                        side_effect=OSError(errno.ENOSYS, "")) as m1:
+            with mock.patch("psutil._pslinux.Process._is_zombie",
+                            return_value=True) as m2:
+                p = psutil.Process()
+                p.name()
+                with self.assertRaises(psutil.ZombieProcess) as exc:
+                    p.rlimit(psutil.RLIMIT_NOFILE)
+        assert m1.called
+        assert m2.called
         self.assertEqual(exc.exception.pid, p.pid)
         self.assertEqual(exc.exception.name, p.name())
 
@@ -2200,7 +2180,7 @@ class TestProcess(PsutilTestCase):
             self.assertEqual(gids.real, 1004)
             self.assertEqual(gids.effective, 1005)
             self.assertEqual(gids.saved, 1006)
-            self.assertEqual(p._proc._get_eligible_cpus(), list(range(0, 8)))
+            self.assertEqual(p._proc._get_eligible_cpus(), list(range(8)))
 
     def test_connections_enametoolong(self):
         # Simulate a case where /proc/{pid}/fd/{fd} symlink points to

@@ -43,8 +43,7 @@ if POSIX:
 
 
 def ps(fmt, pid=None):
-    """
-    Wrapper for calling the ps command with a little bit of cross-platform
+    """Wrapper for calling the ps command with a little bit of cross-platform
     support for a narrow range of features.
     """
 
@@ -62,19 +61,13 @@ def ps(fmt, pid=None):
             cmd.append('ax')
 
     if SUNOS:
-        # XXX: set() has not get() method so this cannot work; not sure
-        # what I meant in here.
-        fmt_map = set(('command', 'comm', 'start', 'stime'))
-        fmt = fmt_map.get(fmt, fmt)
+        fmt = fmt.replace("start", "stime")
 
     cmd.extend(['-o', fmt])
 
     output = sh(cmd)
 
-    if LINUX:
-        output = output.splitlines()
-    else:
-        output = output.splitlines()[1:]
+    output = output.splitlines() if LINUX else output.splitlines()[1:]
 
     all_output = []
     for line in output:
@@ -327,7 +320,7 @@ class TestSystemAPIs(PsutilTestCase):
     @unittest.skipIf(not HAS_NET_IO_COUNTERS, "not supported")
     def test_nic_names(self):
         output = sh("ifconfig -a")
-        for nic in psutil.net_io_counters(pernic=True).keys():
+        for nic in psutil.net_io_counters(pernic=True):
             for line in output.split():
                 if line.startswith(nic):
                     break
@@ -358,6 +351,7 @@ class TestSystemAPIs(PsutilTestCase):
         out = sh("who -u")
         if not out.strip():
             raise self.skipTest("no users on this system")
+        tstamp = None
         # '2023-04-11 09:31' (Linux)
         started = re.findall(r"\d\d\d\d-\d\d-\d\d \d\d:\d\d", out)
         if started:
@@ -368,8 +362,21 @@ class TestSystemAPIs(PsutilTestCase):
             if started:
                 tstamp = "%b %d %H:%M"
             else:
-                raise ValueError(
-                    "cannot interpret tstamp in who output\n%s" % (out))
+                # 'Apr 10'
+                started = re.findall(r"[A-Z][a-z][a-z] \d\d", out)
+                if started:
+                    tstamp = "%b %d"
+                else:
+                    # 'apr 10' (sunOS)
+                    started = re.findall(r"[a-z][a-z][a-z] \d\d", out)
+                    if started:
+                        tstamp = "%b %d"
+                        started = [x.capitalize() for x in started]
+
+        if not tstamp:
+            raise unittest.SkipTest(
+                "cannot interpret tstamp in who output\n%s" % (out))
+
         with self.subTest(psutil=psutil.users(), who=out):
             for idx, u in enumerate(psutil.users()):
                 psutil_value = datetime.datetime.fromtimestamp(

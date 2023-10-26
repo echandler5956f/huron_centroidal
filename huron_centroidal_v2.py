@@ -1,11 +1,10 @@
-#!/home/quant/ros/ocs2_ws/src/huron_centroidal/.venv/bin/python3
+#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
 
 import casadi
 import numpy as np
 import pinocchio as pin
 from dataclasses import dataclass
 from pinocchio import casadi as cpin
-from pinocchio.robot_wrapper import RobotWrapper
 
 
 @dataclass
@@ -152,70 +151,51 @@ class CentroidalTrajOpt():
         s.cgu = casadi.SX.sym("gu", 6, 1)
         s.cvj = casadi.SX.sym("vj", s.nv - 6, 1)
         s.DT = casadi.SX.sym("dt", 1, 1)
+
+        s.ch = s.cx[:s.nh] # momenta: nh x 1
+        s.cdh = s.cx[s.nq+s.nh:s.nq+s.nh+s.nh] # momenta time derivative: nh x 1
+        s.cdh_ = s.cdx[:s.nh] # momenta delta: nh x 1
+        s.cddh_ = s.cdx[s.nv+s.nh:s.nv+s.nh+s.nh] # momenta time derivative delta: nh x 1
+        s.cq = s.cx[s.nh:s.nq+s.nh] # q: nq x 1
+        s.cdq = s.cdx[s.nh:s.nv+s.nh] # q delta: nv x 1
+        s.cv = s.cx[s.nq+s.nh+s.nh:] # v: nv x 1
+        s.cdv = s.cdx[s.nv+s.nh+s.nh:] # v delta: nv x 1
+        s.cf = s.cgu[:3] # f: 3 x 1
+        s.ctau = s.cgu[3:] # tau: 3 x 1
         
         s.T = s.cons.t_list # replace with sym
         
         s.xdot = None
         s.L = None
-        
-    def Get_ch(s):
-        return s.cx[:s.nh] # momenta: nh x 1
-    
-    def Get_cdh(s):
-        return s.cx[s.nq+s.nh:s.nq+s.nh+s.nh] # momenta time derivative: nh x 1
-    
-    def Get_cdh_(s):
-        return s.cdx[:s.nh] # momenta delta: nh x 1
-    
-    def Get_cddh_(s):
-        return s.cdx[s.nv+s.nh:s.nv+s.nh+s.nh] # momenta time derivative delta: nh x 1
-    
-    def Get_cq(s):
-         return s.cx[s.nh:s.nq+s.nh] # q: nq x 1
-     
-    def Get_cdq(s):
-         return s.cdx[s.nh:s.nv+s.nh] # q delta: nv x 1
-         
-    def Get_cv(s):
-        return s.cx[s.nq+s.nh+s.nh:] # v: nv x 1
-    
-    def Get_cdv(s):
-        return s.cdx[s.nv+s.nh+s.nh:] # v delta: nv x 1
-    
-    def Get_cf(s):
-        return s.cgu[:3] # f: 3 x 1
-    
-    def Get_ctau(s):
-        return s.cgu[3:] # tau: 3 x 1
     
     def Get_dt_k(s, k):
         i = s.cons.GetCurrentPhase(k)
         return i, s.T[i] / s.cons.step_list[i]
     
     def ComputeCasadiGraphs(s):
-        cpin.centerOfMass(s.cmodel, s.cdata, s.Get_cq(), False)
-        cpin.computeCentroidalMap(s.cmodel, s.cdata, s.Get_cq())
-        cpin.forwardKinematics(s.cmodel, s.cdata, s.Get_cq(), s.Get_cv())
+        cpin.centerOfMass(s.cmodel, s.cdata, s.cq, False)
+        cpin.computeCentroidalMap(s.cmodel, s.cdata, s.cq)
+        cpin.forwardKinematics(s.cmodel, s.cdata, s.cq, s.cv)
         cpin.updateFramePlacements(s.cmodel, s.cdata)
         Ag = s.cdata.Ag
         s.cintegrate = casadi.Function(
             "integrate",
             [s.cx, s.cdx],
-            [casadi.vertcat(s.Get_ch() + s.Get_cdh_(),
-                            cpin.integrate(s.cmodel, s.Get_cq(), s.Get_cdq()), 
-                            s.Get_cdh() + s.Get_cddh_(),
-                            s.Get_cv() + s.Get_cdv())],
+            [casadi.vertcat(s.ch + s.cdh_,
+                            cpin.integrate(s.cmodel, s.cq, s.cdq), 
+                            s.cdh + s.cddh_,
+                            s.cv + s.cdv)],
         )
         s.xdot = casadi.Function(
             "xdot",
             [s.cx, s.cgu, s.cvj, s.DT],
             [
                 casadi.vertcat(
-                    s.Get_cdh(),
-                    cpin.integrate(s.cmodel, s.Get_cq(), s.Get_cv()),
-                    (s.Get_cf() - s.m*s.p.g)/s.m,
-                    (s.Get_ctau())/s.m,
-                    casadi.mtimes(casadi.inv(Ag[:,:6]), (s.m * s.Get_ch() - casadi.mtimes(Ag[:,6:], s.cvj))),
+                    s.cdh,
+                    cpin.integrate(s.cmodel, s.cq, s.cv),
+                    (s.cf - s.m*s.p.g)/s.m,
+                    (s.ctau)/s.m,
+                    casadi.mtimes(casadi.inv(Ag[:,:6]), (s.m * s.ch - casadi.mtimes(Ag[:,6:], s.cvj))),
                     s.cvj,
                 )
             ],
@@ -225,7 +205,7 @@ class CentroidalTrajOpt():
             "L",
             [s.cx, s.cgu, s.cvj],
             [
-                casadi.sumsqr(s.Get_cv()) + casadi.sumsqr(s.Get_cf() + casadi.sumsqr(s.Get_ctau()))
+                casadi.sumsqr(s.cv) + casadi.sumsqr(s.cf) + casadi.sumsqr(s.ctau)
             ],
         )
 
@@ -278,7 +258,7 @@ class CentroidalTrajOpt():
                     s.var_us.append(opti.variable(legsize))
                     s.u_idxs[ee].extend(offset + k)
                 else:
-                    s.var_us.append(casadi.MX.zeros(legsize))
+                    s.var_us.append(casadi.SX.zeros(legsize))
         
         x_k = var_xs[0]
         for k in range(s.N):
@@ -307,7 +287,8 @@ class CentroidalTrajOpt():
                     # add swing constraints
                     # opti.subject_to(vel_foot(var_xs[t]) == 0)
             u_k = casadi.vertcat(grf, tau)
-                                
+            vj_k = var_vjs[k]
+
             # State at collocation points
             x_c = []
             for j in range(s.col.degree):
@@ -323,18 +304,19 @@ class CentroidalTrajOpt():
                     x_p += s.col.C[r + 1, j] * x_c[r]
                 
                 # Append collocation equations
-                fj = s.xdot(x_c[j - 1], u_k, var_vjs[k])
-                qj = s.L(x_c[j - 1], u_k, var_vjs[k])
-                opti.subject_to(fj - x_p == 0)
+                fj = s.xdot(x_c[j - 1], u_k, vj_k)
+                qj = s.L(x_c[j - 1], u_k, vj_k)
+                opti.subject_to(dt*fj - x_p == 0)
                 # Add contribution to the end state
                 x_k_end += s.col.D[j] * x_c[j-1]
                 # Add contribution to quadrature function
-                totalcost += s.col.B[j] * qj * s.DT
+                totalcost += s.col.B[j] * qj * dt
                 
-            # New NLP variable for state at end of interval
-            x_k = var_xs[k]
-            # Add equality constraint
-            opti.subject_to(x_k_end - x_k == 0)
+            if k < s.N:
+                # New NLP variable for state at end of interval
+                x_k = var_xs[k + 1]
+                # Add equality constraint
+                opti.subject_to(x_k_end - x_k == 0)
             
             
         ### SOLVE

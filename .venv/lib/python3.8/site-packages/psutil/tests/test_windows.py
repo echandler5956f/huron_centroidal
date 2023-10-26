@@ -65,7 +65,7 @@ class WindowsTestCase(PsutilTestCase):
 
 
 def powershell(cmd):
-    """Currently not used, but avalable just in case. Usage:
+    """Currently not used, but available just in case. Usage:
 
     >>> powershell(
         "Get-CIMInstance Win32_PageFileUsage | Select AllocatedBaseSize")
@@ -79,7 +79,7 @@ def powershell(cmd):
 
 
 def wmic(path, what, converter=int):
-    """Currently not used, but avalable just in case. Usage:
+    """Currently not used, but available just in case. Usage:
 
     >>> wmic("Win32_OperatingSystem", "FreePhysicalMemory")
     2134124534
@@ -374,15 +374,15 @@ class TestProcess(WindowsTestCase):
         # that nothing strange happens
         str(p)
         p.username()
-        self.assertTrue(p.create_time() >= 0.0)
+        self.assertGreaterEqual(p.create_time(), 0.0)
         try:
             rss, vms = p.memory_info()[:2]
         except psutil.AccessDenied:
             # expected on Windows Vista and Windows 7
-            if not platform.uname()[1] in ('vista', 'win-7', 'win7'):
+            if platform.uname()[1] not in ('vista', 'win-7', 'win7'):
                 raise
         else:
-            self.assertTrue(rss > 0)
+            self.assertGreater(rss, 0)
 
     def test_send_signal(self):
         p = psutil.Process(self.pid)
@@ -625,14 +625,13 @@ class TestProcessWMI(WindowsTestCase):
 
 @unittest.skipIf(not WINDOWS, "WINDOWS only")
 class TestDualProcessImplementation(PsutilTestCase):
-    """
-    Certain APIs on Windows have 2 internal implementations, one
+    """Certain APIs on Windows have 2 internal implementations, one
     based on documented Windows APIs, another one based
     NtQuerySystemInformation() which gets called as fallback in
     case the first fails because of limited permission error.
     Here we test that the two methods return the exact same value,
     see:
-    https://github.com/giampaolo/psutil/issues/304
+    https://github.com/giampaolo/psutil/issues/304.
     """
 
     @classmethod

@@ -16,7 +16,6 @@ import re
 import socket
 import struct
 import sys
-import traceback
 import warnings
 from collections import defaultdict
 from collections import namedtuple
@@ -53,7 +52,7 @@ from ._compat import b
 from ._compat import basestring
 
 
-if sys.version_info >= (3, 4):
+if PY3:
     import enum
 else:
     enum = None
@@ -68,7 +67,8 @@ __extra__all__ = [
     # connection status constants
     "CONN_ESTABLISHED", "CONN_SYN_SENT", "CONN_SYN_RECV", "CONN_FIN_WAIT1",
     "CONN_FIN_WAIT2", "CONN_TIME_WAIT", "CONN_CLOSE", "CONN_CLOSE_WAIT",
-    "CONN_LAST_ACK", "CONN_LISTEN", "CONN_CLOSING", ]
+    "CONN_LAST_ACK", "CONN_LISTEN", "CONN_CLOSING"
+]
 
 
 # =====================================================================
@@ -283,9 +283,9 @@ def set_scputimes_ntuple(procfs_path):
 
 try:
     set_scputimes_ntuple("/proc")
-except Exception:  # pragma: no cover
+except Exception as err:  # pragma: no cover
     # Don't want to crash at import time.
-    traceback.print_exc()
+    debug("ignoring exception on import: %r" % err)
     scputimes = namedtuple('scputimes', 'user system idle')(0.0, 0.0, 0.0)
 
 
@@ -345,7 +345,7 @@ if prlimit is not None:
 def calculate_avail_vmem(mems):
     """Fallback for kernels < 3.14 where /proc/meminfo does not provide
     "MemAvailable", see:
-    https://blog.famzah.net/2014/09/24/
+    https://blog.famzah.net/2014/09/24/.
 
     This code reimplements the algorithm outlined here:
     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/
@@ -549,8 +549,8 @@ def swap_memory():
         f = open_binary("%s/vmstat" % get_procfs_path())
     except IOError as err:
         # see https://github.com/giampaolo/psutil/issues/722
-        msg = "'sin' and 'sout' swap memory stats couldn't " \
-              "be determined and were set to 0 (%s)" % str(err)
+        msg = "'sin' and 'sout' swap memory stats couldn't " + \
+            "be determined and were set to 0 (%s)" % str(err)
         warnings.warn(msg, RuntimeWarning, stacklevel=2)
         sin = sout = 0
     else:
@@ -569,8 +569,8 @@ def swap_memory():
                 # we might get here when dealing with exotic Linux
                 # flavors, see:
                 # https://github.com/giampaolo/psutil/issues/313
-                msg = "'sin' and 'sout' swap memory stats couldn't " \
-                      "be determined and were set to 0"
+                msg = "'sin' and 'sout' swap memory stats couldn't "
+                msg += "be determined and were set to 0"
                 warnings.warn(msg, RuntimeWarning, stacklevel=2)
                 sin = sout = 0
     return _common.sswap(total, used, free, percent, sin, sout)
@@ -710,8 +710,7 @@ def cpu_stats():
 
 
 def _cpu_get_cpuinfo_freq():
-    """Return current CPU frequency from cpuinfo if available.
-    """
+    """Return current CPU frequency from cpuinfo if available."""
     ret = []
     with open_binary('%s/cpuinfo' % get_procfs_path()) as f:
         for line in f:
@@ -958,7 +957,7 @@ class Connections:
                     raise RuntimeError(
                         "error while parsing %s; malformed line %r" % (
                             file, line))
-                if inode in inodes:
+                if inode in inodes:  # noqa
                     # With UNIX sockets we can have a single inode
                     # referencing many file descriptors.
                     pairs = inodes[inode]
@@ -968,10 +967,7 @@ class Connections:
                     if filter_pid is not None and filter_pid != pid:
                         continue
                     else:
-                        if len(tokens) == 8:
-                            path = tokens[-1]
-                        else:
-                            path = ""
+                        path = tokens[-1] if len(tokens) == 8 else ''
                         type_ = _common.socktype_to_enum(int(type_))
                         # XXX: determining the remote endpoint of a
                         # UNIX socket on Linux is not possible, see:
@@ -1191,8 +1187,9 @@ class RootFsDeviceFinder:
     or "rootfs". This container class uses different strategies to try to
     obtain the real device path. Resources:
     https://bootlin.com/blog/find-root-device/
-    https://www.systutorials.com/how-to-find-the-disk-where-root-is-on-in-bash-on-linux/
+    https://www.systutorials.com/how-to-find-the-disk-where-root-is-on-in-bash-on-linux/.
     """
+
     __slots__ = ['major', 'minor']
 
     def __init__(self):
@@ -1455,7 +1452,7 @@ def sensors_battery():
     Implementation note: it appears /sys/class/power_supply/BAT0/
     directory structure may vary and provide files with the same
     meaning but under different names, see:
-    https://github.com/giampaolo/psutil/issues/966
+    https://github.com/giampaolo/psutil/issues/966.
     """
     null = object()
 
@@ -1654,17 +1651,17 @@ def wrap_exceptions(fun):
         except PermissionError:
             raise AccessDenied(self.pid, self._name)
         except ProcessLookupError:
+            self._raise_if_zombie()
             raise NoSuchProcess(self.pid, self._name)
         except FileNotFoundError:
+            self._raise_if_zombie()
             if not os.path.exists("%s/%s" % (self._procfs_path, self.pid)):
                 raise NoSuchProcess(self.pid, self._name)
-            # Note: zombies will keep existing under /proc until they're
-            # gone so there's no way to distinguish them in here.
             raise
     return wrapper
 
 
-class Process(object):
+class Process:
     """Linux process implementation."""
 
     __slots__ = ["pid", "_name", "_ppid", "_procfs_path", "_cache"]
@@ -1675,7 +1672,27 @@ class Process(object):
         self._ppid = None
         self._procfs_path = get_procfs_path()
 
-    def _assert_alive(self):
+    def _is_zombie(self):
+        # Note: most of the times Linux is able to return info about the
+        # process even if it's a zombie, and /proc/{pid} will exist.
+        # There are some exceptions though, like exe(), cmdline() and
+        # memory_maps(). In these cases /proc/{pid}/{file} exists but
+        # it's empty. Instead of returning a "null" value we'll raise an
+        # exception.
+        try:
+            data = bcat("%s/%s/stat" % (self._procfs_path, self.pid))
+        except (IOError, OSError):
+            return False
+        else:
+            rpar = data.rfind(b')')
+            status = data[rpar + 2:rpar + 3]
+            return status == b"Z"
+
+    def _raise_if_zombie(self):
+        if self._is_zombie():
+            raise ZombieProcess(self.pid, self._name, self._ppid)
+
+    def _raise_if_not_alive(self):
         """Raise NSP if the process disappeared on us."""
         # For those C function who do not raise NSP, possibly returning
         # incorrect or incomplete result.
@@ -1749,22 +1766,18 @@ class Process(object):
         # XXX - gets changed later and probably needs refactoring
         return name
 
+    @wrap_exceptions
     def exe(self):
         try:
             return readlink("%s/%s/exe" % (self._procfs_path, self.pid))
         except (FileNotFoundError, ProcessLookupError):
+            self._raise_if_zombie()
             # no such file error; might be raised also if the
             # path actually exists for system processes with
             # low pids (about 0-20)
             if os.path.lexists("%s/%s" % (self._procfs_path, self.pid)):
                 return ""
-            else:
-                if not pid_exists(self.pid):
-                    raise NoSuchProcess(self.pid, self._name)
-                else:
-                    raise ZombieProcess(self.pid, self._name, self._ppid)
-        except PermissionError:
-            raise AccessDenied(self.pid, self._name)
+            raise
 
     @wrap_exceptions
     def cmdline(self):
@@ -1772,6 +1785,7 @@ class Process(object):
             data = f.read()
         if not data:
             # may happen in case of zombie process
+            self._raise_if_zombie()
             return []
         # 'man proc' states that args are separated by null bytes '\0'
         # and last char is supposed to be a null byte. Nevertheless
@@ -1884,33 +1898,31 @@ class Process(object):
         #  ============================================================
         with open_binary("%s/%s/statm" % (self._procfs_path, self.pid)) as f:
             vms, rss, shared, text, lib, data, dirty = \
-                [int(x) * PAGESIZE for x in f.readline().split()[:7]]
+                (int(x) * PAGESIZE for x in f.readline().split()[:7])
         return pmem(rss, vms, shared, text, lib, data, dirty)
 
     if HAS_PROC_SMAPS_ROLLUP or HAS_PROC_SMAPS:
 
-        @wrap_exceptions
         def _parse_smaps_rollup(self):
             # /proc/pid/smaps_rollup was added to Linux in 2017. Faster
             # than /proc/pid/smaps. It reports higher PSS than */smaps
             # (from 1k up to 200k higher; tested against all processes).
+            # IMPORTANT: /proc/pid/smaps_rollup is weird, because it
+            # raises ESRCH / ENOENT for many PIDs, even if they're alive
+            # (also as root). In that case we'll use /proc/pid/smaps as
+            # fallback, which is slower but has a +50% success rate
+            # compared to /proc/pid/smaps_rollup.
             uss = pss = swap = 0
-            try:
-                with open_binary("{}/{}/smaps_rollup".format(
-                        self._procfs_path, self.pid)) as f:
-                    for line in f:
-                        if line.startswith(b"Private_"):
-                            # Private_Clean, Private_Dirty, Private_Hugetlb
-                            uss += int(line.split()[1]) * 1024
-                        elif line.startswith(b"Pss:"):
-                            pss = int(line.split()[1]) * 1024
-                        elif line.startswith(b"Swap:"):
-                            swap = int(line.split()[1]) * 1024
-            except ProcessLookupError:  # happens on readline()
-                if not pid_exists(self.pid):
-                    raise NoSuchProcess(self.pid, self._name)
-                else:
-                    raise ZombieProcess(self.pid, self._name, self._ppid)
+            with open_binary("{}/{}/smaps_rollup".format(
+                    self._procfs_path, self.pid)) as f:
+                for line in f:
+                    if line.startswith(b"Private_"):
+                        # Private_Clean, Private_Dirty, Private_Hugetlb
+                        uss += int(line.split()[1]) * 1024
+                    elif line.startswith(b"Pss:"):
+                        pss = int(line.split()[1]) * 1024
+                    elif line.startswith(b"Swap:"):
+                        swap = int(line.split()[1]) * 1024
             return (uss, pss, swap)
 
         @wrap_exceptions
@@ -1943,9 +1955,15 @@ class Process(object):
             swap = sum(map(int, _swap_re.findall(smaps_data))) * 1024
             return (uss, pss, swap)
 
+        @wrap_exceptions
         def memory_full_info(self):
             if HAS_PROC_SMAPS_ROLLUP:  # faster
-                uss, pss, swap = self._parse_smaps_rollup()
+                try:
+                    uss, pss, swap = self._parse_smaps_rollup()
+                except (ProcessLookupError, FileNotFoundError) as err:
+                    debug("ignore %r for pid %s and retry using "
+                          "/proc/pid/smaps" % (err, self.pid))
+                    uss, pss, swap = self._parse_smaps()
             else:
                 uss, pss, swap = self._parse_smaps()
             basic_mem = self.memory_info()
@@ -1960,7 +1978,7 @@ class Process(object):
         def memory_maps(self):
             """Return process's mapped memory regions as a list of named
             tuples. Fields are explained in 'man proc'; here is an updated
-            (Apr 2012) version: http://goo.gl/fmebo
+            (Apr 2012) version: http://goo.gl/fmebo.
 
             /proc/{PID}/smaps does not exist on kernels < 2.6.14 or if
             CONFIG_MMU kernel configuration option is not enabled.
@@ -1986,8 +2004,10 @@ class Process(object):
                 yield (current_block.pop(), data)
 
             data = self._read_smaps_file()
-            # Note: smaps file can be empty for certain processes.
+            # Note: smaps file can be empty for certain processes or for
+            # zombies.
             if not data:
+                self._raise_if_zombie()
                 return []
             lines = data.split(b'\n')
             ls = []
@@ -2026,14 +2046,7 @@ class Process(object):
 
     @wrap_exceptions
     def cwd(self):
-        try:
-            return readlink("%s/%s/cwd" % (self._procfs_path, self.pid))
-        except (FileNotFoundError, ProcessLookupError):
-            # https://github.com/giampaolo/psutil/issues/986
-            if not pid_exists(self.pid):
-                raise NoSuchProcess(self.pid, self._name)
-            else:
-                raise ZombieProcess(self.pid, self._name, self._ppid)
+        return readlink("%s/%s/cwd" % (self._procfs_path, self.pid))
 
     @wrap_exceptions
     def num_ctx_switches(self,
@@ -2082,7 +2095,7 @@ class Process(object):
             ntuple = _common.pthread(int(thread_id), utime, stime)
             retlist.append(ntuple)
         if hit_enoent:
-            self._assert_alive()
+            self._raise_if_not_alive()
         return retlist
 
     @wrap_exceptions
@@ -2175,12 +2188,11 @@ class Process(object):
                             "got %s" % repr(limits))
                     prlimit(self.pid, resource_, limits)
             except OSError as err:
-                if err.errno == errno.ENOSYS and pid_exists(self.pid):
+                if err.errno == errno.ENOSYS:
                     # I saw this happening on Travis:
                     # https://travis-ci.org/giampaolo/psutil/jobs/51368273
-                    raise ZombieProcess(self.pid, self._name, self._ppid)
-                else:
-                    raise
+                    self._raise_if_zombie()
+                raise
 
     @wrap_exceptions
     def status(self):
@@ -2235,13 +2247,13 @@ class Process(object):
                             path, int(fd), int(pos), mode, flags)
                         retlist.append(ntuple)
         if hit_enoent:
-            self._assert_alive()
+            self._raise_if_not_alive()
         return retlist
 
     @wrap_exceptions
     def connections(self, kind='inet'):
         ret = _connections.retrieve(kind, self.pid)
-        self._assert_alive()
+        self._raise_if_not_alive()
         return ret
 
     @wrap_exceptions

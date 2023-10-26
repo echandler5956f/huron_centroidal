@@ -1,4 +1,4 @@
-#!/home/quant/ros/ocs2_ws/src/huron_centroidal/.venv/bin/python3
+#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
 # :Copyright: © 2015 Günter Milde.
 # :License: Released under the terms of the `2-Clause BSD license`_, in short:
 #

@@ -1,4 +1,4 @@
-#!/home/quant/ros/ocs2_ws/src/huron_centroidal/.venv/bin/python3
+#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
 
 # $Id: rst2pseudoxml.py 9115 2022-07-28 17:06:24Z milde $
 # Author: David Goodger <goodger@python.org>

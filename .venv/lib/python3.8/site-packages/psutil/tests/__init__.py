@@ -4,9 +4,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""
-Test utilities.
-"""
+"""Test utilities."""
 
 from __future__ import print_function
 
@@ -43,6 +41,8 @@ import psutil
 from psutil import AIX
 from psutil import LINUX
 from psutil import MACOS
+from psutil import NETBSD
+from psutil import OPENBSD
 from psutil import POSIX
 from psutil import SUNOS
 from psutil import WINDOWS
@@ -67,7 +67,7 @@ except ImportError:
         warnings.simplefilter("ignore")
         import mock  # NOQA - requires "pip install mock"
 
-if sys.version_info >= (3, 4):
+if PY3:
     import enum
 else:
     enum = None
@@ -366,9 +366,11 @@ def spawn_testproc(cmd=None, **kwds):
         testfn = get_testfn()
         try:
             safe_rmpath(testfn)
-            pyline = "from time import sleep;" \
-                     "open(r'%s', 'w').close();" \
-                     "sleep(60);" % testfn
+            pyline = (
+                "from time import sleep;" +
+                "open(r'%s', 'w').close();" % testfn +
+                "sleep(60);"
+            )
             cmd = [PYTHON_EXE, "-c", pyline]
             sproc = subprocess.Popen(cmd, **kwds)
             _subprocesses_started.add(sproc)
@@ -476,7 +478,7 @@ def pyrun(src, **kwds):
     kwds.setdefault("stderr", None)
     srcfile = get_testfn()
     try:
-        with open(srcfile, 'wt') as f:
+        with open(srcfile, "w") as f:
             f.write(src)
         subp = spawn_testproc([PYTHON_EXE, f.name], **kwds)
         wait_for_pid(subp.pid)
@@ -488,7 +490,7 @@ def pyrun(src, **kwds):
 
 @_reap_children_on_err
 def sh(cmd, **kwds):
-    """run cmd in a subprocess and return its output.
+    """Run cmd in a subprocess and return its output.
     raises RuntimeError on error.
     """
     # Prevents subprocess to open error dialogs in case of error.
@@ -668,10 +670,7 @@ def get_winver():
         sp = wv.service_pack_major or 0
     else:
         r = re.search(r"\s\d$", wv[4])
-        if r:
-            sp = int(r.group(0))
-        else:
-            sp = 0
+        sp = int(r.group(0)) if r else 0
     return (wv[0], wv[1], sp)
 
 
@@ -680,7 +679,7 @@ def get_winver():
 # ===================================================================
 
 
-class retry(object):
+class retry:
     """A retry decorator."""
 
     def __init__(self,
@@ -770,7 +769,7 @@ def call_until(fun, expr):
     expression is True.
     """
     ret = fun()
-    assert eval(expr)
+    assert eval(expr)  # noqa
     return ret
 
 
@@ -847,7 +846,7 @@ def create_exe(outpath, c_code=None):
                 }
                 """)
         assert isinstance(c_code, str), c_code
-        with open(get_testfn(suffix='.c'), 'wt') as f:
+        with open(get_testfn(suffix='.c'), "w") as f:
             f.write(c_code)
         try:
             subprocess.check_call(["gcc", f.name, "-o", outpath])
@@ -892,7 +891,7 @@ class TestCase(unittest.TestCase):
     # assertRaisesRegexp renamed to assertRaisesRegex in 3.3;
     # add support for the new name.
     if not hasattr(unittest.TestCase, 'assertRaisesRegex'):
-        assertRaisesRegex = unittest.TestCase.assertRaisesRegexp
+        assertRaisesRegex = unittest.TestCase.assertRaisesRegexp  # noqa
 
     # ...otherwise multiprocessing.Pool complains
     if not PY3:
@@ -942,20 +941,113 @@ class PsutilTestCase(TestCase):
         self.addCleanup(terminate, sproc)  # executed first
         return sproc
 
-    def assertProcessGone(self, proc):
-        self.assertRaises(psutil.NoSuchProcess, psutil.Process, proc.pid)
-        if isinstance(proc, (psutil.Process, psutil.Popen)):
-            assert not proc.is_running()
+    def _check_proc_exc(self, proc, exc):
+        self.assertIsInstance(exc, psutil.Error)
+        self.assertEqual(exc.pid, proc.pid)
+        self.assertEqual(exc.name, proc._name)
+        if exc.name:
+            self.assertNotEqual(exc.name, "")
+        if isinstance(exc, psutil.ZombieProcess):
+            self.assertEqual(exc.ppid, proc._ppid)
+            if exc.ppid is not None:
+                self.assertGreaterEqual(exc.ppid, 0)
+        str(exc)
+        repr(exc)
+
+    def assertPidGone(self, pid):
+        with self.assertRaises(psutil.NoSuchProcess) as cm:
             try:
-                status = proc.status()
-            except psutil.NoSuchProcess:
-                pass
-            else:
-                raise AssertionError("Process.status() didn't raise exception "
-                                     "(status=%s)" % status)
-            proc.wait(timeout=0)  # assert not raise TimeoutExpired
-        assert not psutil.pid_exists(proc.pid), proc.pid
-        self.assertNotIn(proc.pid, psutil.pids())
+                psutil.Process(pid)
+            except psutil.ZombieProcess:
+                raise AssertionError(
+                    "wasn't supposed to raise ZombieProcess")
+        self.assertEqual(cm.exception.pid, pid)
+        self.assertEqual(cm.exception.name, None)
+        assert not psutil.pid_exists(pid), pid
+        self.assertNotIn(pid, psutil.pids())
+        self.assertNotIn(pid, [x.pid for x in psutil.process_iter()])
+
+    def assertProcessGone(self, proc):
+        self.assertPidGone(proc.pid)
+        ns = process_namespace(proc)
+        for fun, name in ns.iter(ns.all, clear_cache=True):
+            with self.subTest(proc=proc, name=name):
+                try:
+                    ret = fun()
+                except psutil.ZombieProcess:
+                    raise
+                except psutil.NoSuchProcess as exc:
+                    self._check_proc_exc(proc, exc)
+                else:
+                    msg = "Process.%s() didn't raise NSP and returned %r" % (
+                        name, ret)
+                    raise AssertionError(msg)
+        proc.wait(timeout=0)  # assert not raise TimeoutExpired
+
+    def assertProcessZombie(self, proc):
+        # A zombie process should always be instantiable.
+        clone = psutil.Process(proc.pid)
+        # Cloned zombie on Open/NetBSD has null creation time, see:
+        # https://github.com/giampaolo/psutil/issues/2287
+        self.assertEqual(proc, clone)
+        if not (OPENBSD or NETBSD):
+            self.assertEqual(hash(proc), hash(clone))
+        # Its status always be querable.
+        self.assertEqual(proc.status(), psutil.STATUS_ZOMBIE)
+        # It should be considered 'running'.
+        assert proc.is_running()
+        assert psutil.pid_exists(proc.pid)
+        # as_dict() shouldn't crash.
+        proc.as_dict()
+        # It should show up in pids() and process_iter().
+        self.assertIn(proc.pid, psutil.pids())
+        self.assertIn(proc.pid, [x.pid for x in psutil.process_iter()])
+        psutil._pmap = {}
+        self.assertIn(proc.pid, [x.pid for x in psutil.process_iter()])
+        # Call all methods.
+        ns = process_namespace(proc)
+        for fun, name in ns.iter(ns.all, clear_cache=True):
+            with self.subTest(proc=proc, name=name):
+                try:
+                    fun()
+                except (psutil.ZombieProcess, psutil.AccessDenied) as exc:
+                    self._check_proc_exc(proc, exc)
+        if LINUX:
+            # https://github.com/giampaolo/psutil/pull/2288
+            with self.assertRaises(psutil.ZombieProcess) as cm:
+                proc.cmdline()
+            self._check_proc_exc(proc, cm.exception)
+            with self.assertRaises(psutil.ZombieProcess) as cm:
+                proc.exe()
+            self._check_proc_exc(proc, cm.exception)
+            with self.assertRaises(psutil.ZombieProcess) as cm:
+                proc.memory_maps()
+            self._check_proc_exc(proc, cm.exception)
+        # Zombie cannot be signaled or terminated.
+        proc.suspend()
+        proc.resume()
+        proc.terminate()
+        proc.kill()
+        assert proc.is_running()
+        assert psutil.pid_exists(proc.pid)
+        self.assertIn(proc.pid, psutil.pids())
+        self.assertIn(proc.pid, [x.pid for x in psutil.process_iter()])
+        psutil._pmap = {}
+        self.assertIn(proc.pid, [x.pid for x in psutil.process_iter()])
+
+        # Its parent should 'see' it (edit: not true on BSD and MACOS).
+        # descendants = [x.pid for x in psutil.Process().children(
+        #                recursive=True)]
+        # self.assertIn(proc.pid, descendants)
+
+        # __eq__ can't be relied upon because creation time may not be
+        # querable.
+        # self.assertEqual(proc, psutil.Process(proc.pid))
+
+        # XXX should we also assume ppid() to be usable? Note: this
+        # would be an important use case as the only way to get
+        # rid of a zombie is to kill its parent.
+        # self.assertEqual(proc.ppid(), os.getpid())
 
 
 @unittest.skipIf(PYPY, "unreliable on PYPY")
@@ -989,6 +1081,7 @@ class TestMemoryLeak(PsutilTestCase):
             def test_fun(self):
                 self.execute(some_function)
     """
+
     # Configurable class attrs.
     times = 200
     warmup_times = 10
@@ -1221,6 +1314,7 @@ class process_namespace:
     >>> for fun, name in ns.iter(ns.getters):
     ...    fun()
     """
+
     utils = [
         ('cpu_percent', (), {}),
         ('memory_percent', (), {}),
@@ -1357,6 +1451,7 @@ class system_namespace:
     >>> for fun, name in ns.iter(ns.getters):
     ...    fun()
     """
+
     getters = [
         ('boot_time', (), {}),
         ('cpu_count', (), {'logical': False}),
@@ -1714,9 +1809,6 @@ def import_module_by_path(path):
     if sys.version_info[0] == 2:
         import imp
         return imp.load_source(name, path)
-    elif sys.version_info[:2] <= (3, 4):
-        from importlib.machinery import SourceFileLoader
-        return SourceFileLoader(name, path).load_module()
     else:
         import importlib.util
         spec = importlib.util.spec_from_file_location(name, path)
@@ -1744,7 +1836,7 @@ def is_namedtuple(x):
     f = getattr(t, '_fields', None)
     if not isinstance(f, tuple):
         return False
-    return all(type(n) == str for n in f)
+    return all(isinstance(n, str) for n in f)
 
 
 if POSIX:
@@ -1823,4 +1915,4 @@ def cleanup_test_procs():
 # module. With this it will. See:
 # https://gmpy.dev/blog/2016/how-to-always-execute-exit-functions-in-python
 if POSIX:
-    signal.signal(signal.SIGTERM, lambda sig, frame: sys.exit(sig))
+    signal.signal(signal.SIGTERM, lambda sig, _: sys.exit(sig))

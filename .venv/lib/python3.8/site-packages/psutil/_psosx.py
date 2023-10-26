@@ -144,7 +144,7 @@ def cpu_times():
 
 
 def per_cpu_times():
-    """Return system CPU times as a named tuple"""
+    """Return system CPU times as a named tuple."""
     ret = []
     for cpu_t in cext.per_cpu_times():
         user, nice, system, idle = cpu_t
@@ -174,7 +174,7 @@ def cpu_freq():
     """Return CPU frequency.
     On macOS per-cpu frequency is not supported.
     Also, the returned frequency never changes, see:
-    https://arstechnica.com/civis/viewtopic.php?f=19&t=465002
+    https://arstechnica.com/civis/viewtopic.php?f=19&t=465002.
     """
     curr, min_, max_ = cext.cpu_freq()
     return [_common.scpufreq(curr, min_, max_)]
@@ -332,7 +332,7 @@ def is_zombie(pid):
     try:
         st = cext.proc_kinfo_oneshot(pid)[kinfo_proc_map['status']]
         return st == cext.SZOMB
-    except Exception:
+    except OSError:
         return False
 
 
@@ -351,12 +351,10 @@ def wrap_exceptions(fun):
                 raise NoSuchProcess(self.pid, self._name)
         except PermissionError:
             raise AccessDenied(self.pid, self._name)
-        except cext.ZombieProcessError:
-            raise ZombieProcess(self.pid, self._name, self._ppid)
     return wrapper
 
 
-class Process(object):
+class Process:
     """Wrapper class around underlying C implementation."""
 
     __slots__ = ["pid", "_name", "_ppid", "_cache"]
