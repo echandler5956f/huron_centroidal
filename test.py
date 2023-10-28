@@ -144,41 +144,67 @@ import matplotlib.pyplot as plt
 # Degree of interpolating polynomial
 d = 3
 
-# Get collocation points
-tau_root = np.append(0, ca.collocation_points(d, 'legendre'))
+# # Get collocation points
+# tau_root = np.append(0, ca.collocation_points(d, 'legendre'))
 
-# Coefficients of the collocation equation
-C = np.zeros((d+1,d+1))
+# # Coefficients of the collocation equation
+# C = np.zeros((d+1,d+1))
 
-# Coefficients of the continuity equation
-D = np.zeros(d+1)
+# # Coefficients of the continuity equation
+# D = np.zeros(d+1)
 
-# Coefficients of the quadrature function
-B = np.zeros(d+1)
+# # Coefficients of the quadrature function
+# B = np.zeros(d+1)
 
-# Construct polynomial basis
-for j in range(d+1):
-    # Construct Lagrange polynomials to get the polynomial basis at the collocation point
-    p = np.poly1d([1])
-    for r in range(d+1):
-        if r != j:
-            p *= np.poly1d([1, -tau_root[r]]) / (tau_root[j]-tau_root[r])
+# # Construct polynomial basis
+# for j in range(d+1):
+#     # Construct Lagrange polynomials to get the polynomial basis at the collocation point
+#     p = np.poly1d([1])
+#     for r in range(d+1):
+#         if r != j:
+#             p *= np.poly1d([1, -tau_root[r]]) / (tau_root[j]-tau_root[r])
 
-    # Evaluate the polynomial at the final time to get the coefficients of the continuity equation
-    D[j] = p(1.0)
+#     # Evaluate the polynomial at the final time to get the coefficients of the continuity equation
+#     D[j] = p(1.0)
 
-    # Evaluate the time derivative of the polynomial at all collocation points to get the coefficients of the continuity equation
-    pder = np.polyder(p)
-    for r in range(d+1):
-        C[j,r] = pder(tau_root[r])
+#     # Evaluate the time derivative of the polynomial at all collocation points to get the coefficients of the continuity equation
+#     pder = np.polyder(p)
+#     for r in range(d+1):
+#         C[j,r] = pder(tau_root[r])
 
-    # Evaluate the integral of the polynomial to get the coefficients of the quadrature function
-    pint = np.polyint(p)
-    B[j] = pint(1.0)
+#     # Evaluate the integral of the polynomial to get the coefficients of the quadrature function
+#     pint = np.polyint(p)
+#     B[j] = pint(1.0)
 
-print("C:\n", C)
-print("D:\n", D)
-print("B:\n", B)
+def compute_chebyshev_coefficients(d):
+    # Collocation points
+    tau = np.cos((2*np.arange(1, d+1) - 1) * np.pi / (2*d))
+    
+    # Vandermonde matrix based on the Chebyshev polynomials of the first kind
+    T = np.polynomial.chebyshev.chebvander(tau, d).T
+    
+    # Differentiate the Vandermonde matrix to get derivatives
+    dT = np.zeros((d, d))
+    for i in range(1, d+1):
+        for j in range(d):
+            coef = np.zeros(d+1)
+            coef[i] = 1
+            dcoef = np.polynomial.chebyshev.chebder(coef)
+            dT[i-1, j] = np.polynomial.chebyshev.chebval(tau[j], dcoef)
+            
+    C = np.linalg.solve(T[:-1, :].T, dT.T).T
+
+    # Coefficients for continuity equation
+    D = np.polynomial.chebyshev.chebvander(1, d).T
+
+    # Quadrature weights for Chebyshev-Gauss quadrature
+    B = np.pi / d * np.ones(d)
+
+    return C, D, B
+
+
+
+C, D, B = compute_chebyshev_coefficients(d)
 
 # Time horizon
 T = 10.
@@ -215,7 +241,6 @@ ubg = []
 # For plotting x and u given w
 x_plot = []
 u_plot = []
-xp_plot = []
 
 # "Lift" initial conditions
 Xk = ca.MX.sym('X0', 2)
@@ -249,10 +274,8 @@ for k in range(N):
     Xk_end = D[0]*Xk
     for j in range(1,d+1):
        # Expression for the state derivative at the collocation point
-       xp = C[0,j]*Xk
-       for r in range(d): xp = xp + C[r+1,j]*Xc[r]
-
-       xp_plot.append(xp)
+       xp = C[0,j-1]*Xk  # Adjust indexing for Chebyshev
+        for r in range(d-1): xp = xp + C[r+1,j-1]*Xc[r]  # Adjust indexing for Chebyshev
 
        # Append collocation equations
        fj, qj = f(Xc[j-1],Uk)
@@ -292,7 +315,7 @@ ubg = np.concatenate(ubg)
 
 # Create an NLP solver
 prob = {'f': J, 'x': w, 'g': g}
-solver = ca.nlpsol('solver', 'snopt', prob);
+solver = ca.nlpsol('solver', 'ipopt', prob);
 
 # Function to get x and u trajectories from w
 trajectories = ca.Function('trajectories', [w], [x_plot, u_plot], ['w'], ['x', 'u'])
@@ -305,6 +328,7 @@ u_opt = u_opt.full() # to numpy array
 
 # Plot the result
 tgrid = np.linspace(0, T, N+1)
+
 plt.figure(1)
 plt.clf()
 plt.plot(tgrid, x_opt[0], '--')
@@ -313,7 +337,82 @@ plt.step(tgrid, np.append(np.nan, u_opt[0]), '-.')
 plt.xlabel('t')
 plt.legend(['x1','x2','u'])
 plt.grid()
+# plt.show()
+
+from scipy.interpolate import interp1d
+
+tgrid_new = np.linspace(0, T, 2*N+1)
+f1 = interp1d(tgrid, x_opt[0], kind='cubic')
+f2 = interp1d(tgrid, x_opt[1], kind='cubic')
+u_new = np.interp(tgrid_new, tgrid, np.append(np.nan, u_opt[0]))  # linear interpolation for control
+
+x1_opt_new = f1(tgrid_new)
+x2_opt_new = f2(tgrid_new)
+u_opt_new = np.interp(tgrid_new, tgrid, np.append(np.nan, u_opt[0]))  # linear interpolation for control
+
+
+plt.figure(2)
+plt.clf()
+plt.plot(tgrid_new, x1_opt_new, '--')
+plt.plot(tgrid_new, x2_opt_new, '-')
+plt.step(tgrid_new, u_opt_new, '-.')
+plt.xlabel('t')
+plt.legend(['x1','x2','u'])
+plt.grid()
 plt.show()
+
+
+# # Barycentric interpolation functions
+# def barycentric_weights(x_nodes):
+#     n = len(x_nodes)
+#     w = np.ones(n)
+#     for j in range(n):
+#         for k in range(n):
+#             if j != k:
+#                 w[j] /= (x_nodes[j] - x_nodes[k])
+#     return w
+
+# def barycentric_interpolation(x, x_nodes, f_nodes, w):
+#     numerator = 0
+#     denominator = 0
+#     for j in range(len(x_nodes)):
+#         if x == x_nodes[j]:
+#             return f_nodes[j]
+#         temp = w[j] / (x - x_nodes[j])
+#         numerator += temp * f_nodes[j]
+#         denominator += temp
+#     return numerator / denominator
+
+# # Fetch collocated solutions and store them in a structured manner
+# X_collocated = sol['x'][N+1:N+1+N*d*2].full().reshape((2, d, N), order='F')
+
+# # Interpolation using local barycentric weights
+# num_points_per_interval = 2
+# tgrid_fine = np.linspace(0, T, N*num_points_per_interval)
+
+# x1_fine = []
+# x2_fine = []
+# for k in range(N):
+#     x_nodes_local = [k * h + tau * h for tau in tau_root]
+#     x1_values = [x_opt[0, k]] + [X_collocated[0, j, k] for j in range(d)]
+#     x2_values = [x_opt[1, k]] + [X_collocated[1, j, k] for j in range(d)]
+#     w_bary_local = barycentric_weights(tau_root)
+    
+#     for t_rel in np.linspace(0, h, num_points_per_interval):
+#         tau_val = k * h + t_rel
+#         x1_fine.append(barycentric_interpolation(tau_val, x_nodes_local, x1_values, w_bary_local))
+#         x2_fine.append(barycentric_interpolation(tau_val, x_nodes_local, x2_values, w_bary_local))
+
+# # Plotting
+# plt.figure(1)
+# plt.clf()
+# plt.plot(tgrid_fine, x1_fine, '--')
+# plt.plot(tgrid_fine, x2_fine, '-')
+# plt.step(tgrid, np.append(np.nan, u_opt[0]), '-.')
+# plt.xlabel('t')
+# plt.legend(['x1 (interpolated)', 'x2 (interpolated)', 'u'])
+# plt.grid()
+# plt.show()
 
 
 # # # from casadi import *

@@ -10,6 +10,9 @@ import pinocchio as pin
 from dataclasses import dataclass
 from pinocchio import casadi as cpin
 from utils.meshcat_viewer_wrapper import MeshcatVisualizer
+from scipy.interpolate import interp1d
+from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Slerp
 
 
 # Class for storing end efector information
@@ -41,8 +44,8 @@ class Phase:
 # Class for operating on contacts
 class ContactSequence:
     def __init__(self):
-        self.sequence = []
-        self.cumulative_knots = []
+        self.sequence: List[Phase] = []
+        self.cumulative_knots: List[int] = []
 
     # Add a new phase to the sequence
     # Cumulative_knots[-1] returns the total number of knot points in the sequence
@@ -91,6 +94,19 @@ class ContactSequence:
             if k < cum_knot:
                 return idx
         return None
+
+    def get_time_vec(self, dts: defaultdict(list)):
+        t = defaultdict(list)
+        k = 0
+        tc = 0.0
+        for i in range(self.get_num_phases()):
+            phase = self.sequence[i]
+            t[phase.phase_name] = []
+            for ki in range(phase.knot_points):
+                t[phase.phase_name].append(tc + dts[i])
+                tc += dts[i]
+                k += 1
+        return t
 
 
 # Class for setting up pseudospectral collocation
@@ -142,10 +158,14 @@ class Parameters:
         s.g = np.array([0, 0, 9.81])
         # Friction coefficient
         s.mu = 0.7
+        # Max swing height
+        s.swing_height = 0.15
+        # Frequency to interpolate the solution to
+        s.desired_frequency = 0.01
         # Problem options for casadi
         s.p_opts = {"expand": False}
         # Solver options for casadi
-        s.s_opts = {"max_iter": 10}
+        s.s_opts = {"max_iter": 100}
 
 
 # Main optimization class
@@ -169,7 +189,7 @@ class CentroidalTrajOpt:
         pin.computeTotalMass(s.model, s.data)
 
         s.Mtarget = pin.SE3(
-            pin.utils.rotate("y", np.pi / 2), np.array([0.0775, 0.05, 0.1])
+            pin.utils.rotate("y", np.pi / 2), np.array([0.0775, -0.125, 0.0])
         )  # x,y,z
 
         s.viz.addBox("world/box", [0.05, 0.1, 0.2], [1.0, 0.2, 0.2, 0.5])
@@ -227,6 +247,9 @@ class CentroidalTrajOpt:
         # q delta: nv x 1
         s.cq_d = s.cdx[s.ndh : s.nv + s.ndh]
 
+        # qj: (nq - 7) x 1
+        s.cqj = s.cq[7:]
+
         # v: nv x 1
         s.cv = s.cx[s.ndh + s.nq :]
         # v delta: nv x 1
@@ -251,6 +274,9 @@ class CentroidalTrajOpt:
         # Polynomial v: nv x 1
         s.cvp = s.cxp[s.ndh + s.nq :]
 
+        # Time helper variable
+        s.cdt = ca.SX.sym("dt", 1, 1)
+
         s.cintegrate = None
         s.xdot = None
         s.dx_col = None
@@ -273,17 +299,17 @@ class CentroidalTrajOpt:
         # Integrate over the state and the Lie Group with a small delta
         s.cintegrate = ca.Function(
             "integrate",
-            [s.cx, s.cdx],
+            [s.cx, s.cdx, s.cdt],
             [
                 ca.vertcat(
-                    s.ch + s.ch_d,
-                    s.cdh + s.cdh_d,
-                    cpin.integrate(s.cmodel, s.cq, s.cq_d),
-                    s.cv + s.cv_d,
+                    s.ch_d,
+                    s.cdh_d,
+                    cpin.integrate(s.cmodel, s.cq, s.cq_d * s.cdt),
+                    s.cv_d,
                 )
             ],
-            ["x", "dx"],
-            ["integral(x, dx)"],
+            ["x", "dx", "dt"],
+            ["integral(x, dx, dt)"],
         )
 
         # Centroidal dynamics in continuous time (recall that x = [h; hdot; q; v])
@@ -307,37 +333,16 @@ class CentroidalTrajOpt:
             ["xdot"],
         )
 
-        # Get the tangent vector which transports the state from cq to cqp
-        s.dx_col = ca.Function(
-            "collocated_tangent",
-            [s.cx, s.cxp],
-            [ca.vertcat(s.chp, s.cdhp, cpin.difference(s.cmodel, s.cqp, -s.cq), s.cvp)],
-            ["x", "xp"],
-            ["dx_col"],
-        )
-
-        # Get the difference between two states
-        # Nontrivial due to the quaternion in the base coordinates
-        s.state_error = ca.Function(
-            "state_error",
-            [s.cx, s.cxp],
-            [
-                ca.vertcat(
-                    s.chp - s.ch,
-                    s.cdhp - s.cdh,
-                    cpin.difference(s.cmodel, s.cqp, -s.cq),
-                    s.cvp - s.cv,
-                )
-            ],
-            ["x", "xp"],
-            ["state_error"],
-        )
-
         # Running cost
         s.L = ca.Function(
             "running_cost",
             [s.cx, s.cu, s.cvju],
-            [1e-3 * ca.sumsqr(s.cvj) + 1e-4 * ca.sumsqr(s.cf)],
+            [
+                1e-3 * ca.sumsqr(s.cvju)
+                + 1e-4 * ca.sumsqr(s.cf)
+                + 1e-4 * ca.sumsqr(s.ctau)
+                + 1e1 * ca.sumsqr(s.cqj - s.q0[7:])
+            ],
             ["x", "u", "vju"],
             ["L"],
         )
@@ -408,6 +413,28 @@ class CentroidalTrajOpt:
             )
             for ee in s.cons.get_all_end_effectors()
         }
+        h_00 = 2 * ca.power(s.cdt, 3) - 3 * ca.power(s.cdt, 2) + 1
+        h_01 = -2 * ca.power(s.cdt, 3) + 3 * ca.power(s.cdt, 2)
+        s.swing_track_up = {
+            ee.frame_name: ca.Function(
+                f"swing_track_up_{ee.frame_name}",
+                [s.cx, s.cdt],
+                [
+                    s.cdata.oMf[ee.frame_id].translation[2] - h_01 * s.p.swing_height
+                ]
+            )
+            for ee in s.cons.get_all_end_effectors()
+        }
+        s.swing_track_down = {
+            ee.frame_name: ca.Function(
+                f"swing_track_down_{ee.frame_name}",
+                [s.cx, s.cdt],
+                [
+                    s.cdata.oMf[ee.frame_id].translation[2] - h_00 * s.p.swing_height
+                ]
+            )
+            for ee in s.cons.get_all_end_effectors()
+        }
 
         # Final configuration cost (should only be active for one end effector)
         s.M = {
@@ -429,6 +456,7 @@ class CentroidalTrajOpt:
     # Setup the optimization problem using casadi
     def setup_problem(s):
         opti = ca.Opti()
+        x0 = np.concatenate([np.zeros(s.ndh), s.q0, np.zeros(s.nv)])
         # Small deviations from the initial state
         # var_dxs is an s.N + 1 size list with s.ndx sized vectors
         var_dxs = [opti.variable(s.ndx) for k in range(s.N + 1)]
@@ -449,12 +477,9 @@ class CentroidalTrajOpt:
         # joint acceleration to an associated joint torque using inverse dynamics
         var_vjs = [opti.variable(s.nv - 6) for k in range(s.N)]
         # var_xs is the state integrated from an initial state of np.concatenate([np.zeros(s.ndh), s.q0, np.zeros(s.nv)]) by var_dxs
-        var_xs = [
-            s.cintegrate(
-                np.concatenate([np.zeros(s.ndh), s.q0, np.zeros(s.nv)]), var_dx
-            )
-            for var_dx in var_dxs
-        ]
+        var_xs = [s.cintegrate(x0, var_dx, 1) for var_dx in var_dxs]
+        # Constrain initial stait
+        opti.subject_to(var_xs[0] == x0)
 
         # Set up cost function
         totalcost = 0
@@ -485,10 +510,12 @@ class CentroidalTrajOpt:
 
         # "Lift" initial conditions
         x_k = var_xs[0]
+        dx_k = var_dxs[0]
         # Iterate over each knot point
         for k in range(s.N):
             # Get the relevant phase and dt
             phase = s.cons.get_phase(k)
+            i = s.cons.get_phase_idx(k)
             dt = dts[phase.phase_name]
 
             # grf is the total ground reaction force acting in the COM frame aligned with the inertial frame
@@ -510,10 +537,10 @@ class CentroidalTrajOpt:
                     # Zero velocity at the contact point
                     opti.subject_to(s.vcontacts[ee.frame_name](x_k) == 0)
                     # Friction cone approximation constraint
-                    opti.subject_to(F[0] / F[2] > -s.p.mu)
-                    opti.subject_to(F[0] / F[2] < s.p.mu)
-                    opti.subject_to(F[1] / F[2] > -s.p.mu)
-                    opti.subject_to(F[1] / F[2] < s.p.mu)
+                    # opti.subject_to(F[0] / F[2] > -s.p.mu)
+                    # opti.subject_to(F[0] / F[2] < s.p.mu)
+                    # opti.subject_to(F[1] / F[2] > -s.p.mu)
+                    # opti.subject_to(F[1] / F[2] < s.p.mu)
                     # Unilateral contact constraint
                     # (normal force must be positive- we can push against the ground but we can't pull!)
                     opti.subject_to(F[2] >= 0)
@@ -525,31 +552,39 @@ class CentroidalTrajOpt:
                     if s.cons.get_contact_size(ee) == 6:
                         tau += F[3:]
                 else:
+                    kphase = k
+                    if i > 0:
+                        kphase = k - s.cons.cumulative_knots[i - 1]
+                    t = kphase * dt
+                    tmax = phase.knot_points * dt / 2
                     # Add swing constraints
-                    pass
+                    # if kphase <= phase.knot_points / 2:
+                    #     opti.subject_to(s.swing_track_up[ee.frame_name](x_k, t/tmax) == 0)
+                    # else:
+                    #     opti.subject_to(s.swing_track_down[ee.frame_name](x_k, (t/2)/tmax) == 0)
             # Stack the total ground reaction force and contact wrench
             u_k = ca.vertcat(grf, tau)
             # Get the joint velocities at the current knot point
             vj_k = var_vjs[k]
 
             # State at collocation points (s.col.degree decision variables)
-            x_c = []
+            dx_c = []
             for j in range(s.col.degree):
-                x_kj = opti.variable(s.nx)
-                x_c.append(x_kj)
+                dx_kj = opti.variable(s.ndx)
+                dx_c.append(dx_kj)
 
             # Loop over collocation points
-            x_k_end = s.col.D[0] * x_k
+            dx_k_end = s.col.D[0] * dx_k
             for j in range(1, s.col.degree + 1):
                 # Expression for the state derivative at the collocation point
-                x_p = s.col.C[0, j] * x_k
+                dx_p = s.col.C[0, j] * dx_k
                 for r in range(s.col.degree):
-                    x_p += s.col.C[r + 1, j] * x_c[r]
+                    dx_p += s.col.C[r + 1, j] * dx_c[r]
 
                 # Append collocation equations
-
-                fj = s.xdot(x_c[j - 1], u_k, vj_k)
-                qj = s.L(x_c[j - 1], u_k, vj_k)
+                x_c = s.cintegrate(x_k, dx_c[j - 1], dt)
+                fj = s.xdot(x_c, u_k, vj_k)
+                qj = s.L(x_c, u_k, vj_k)
 
                 # Since the state includes a quaternion which is in a Lie Group,
                 # we need to find the tangent vector which transports us from
@@ -558,22 +593,29 @@ class CentroidalTrajOpt:
                 # since the 'expression for the state derivative at the collocation point' is in terms
                 # of the 4 x 1 vector defining a quaternion, but the state derivative of the quaternion
                 # is actually a 3 x 1 tangent vector. How do you rectify this?
-                dx_col = s.dx_col(x_k, x_p)
+                # dx_col = s.dx_col(x_k, x_p)
 
                 # By multiplying fj with h, we're effectively rescaling the state's rate of change from the
                 # time scale of the problem to the normalized time scale used by Lagrange polynomials
-                opti.subject_to(dt * fj - dx_col == 0)
+                opti.subject_to(dt * fj - dx_p == 0)
                 # Add contribution to the end state
-                x_k_end += s.col.D[j] * x_c[j - 1]
+                dx_k_end += s.col.D[j] * dx_c[j - 1]
                 # Add contribution to quadrature function
-                # totalcost += s.col.B[j] * qj * dt
+                totalcost += s.col.B[j] * qj * dt
 
             # Get the NLP variable for the state at end of interval
             x_k = var_xs[k + 1]
+            dx_k = var_dxs[k + 1]
             # Add equality constraint
-            opti.subject_to(s.state_error(x_k, x_k_end) == 0)
+            opti.subject_to(dx_k_end - dx_k == 0)
 
         totalcost += s.M["r_foot_v_ft_link"](x_k)
+
+        get_dts = ca.Function(
+            "get_dts",
+            [ca.vertcat(*var_dts)],
+            [ca.vertcat(*[dts[phase.phase_name] for phase in s.cons.sequence])],
+        )
 
         print("Optimizing...")
 
@@ -592,18 +634,64 @@ class CentroidalTrajOpt:
         try:
             sol = opti.solve_limited()
             sol_xs = [opti.value(var_x) for var_x in var_xs]
+            sol_dts = get_dts(ca.vertcat(*[opti.value(var_dt) for var_dt in var_dts]))
         except:
             print("ERROR in convergence, plotting debug info.")
             sol_xs = [opti.debug.value(var_x) for var_x in var_xs]
+            sol_dts = get_dts(
+                ca.vertcat(*[opti.debug.value(var_dt) for var_dt in var_dts])
+            )
         print("***** Display the resulting trajectory ...")
-        xdes = [x[s.ndh : s.ndh + s.nq] for x in sol_xs]
+        xdes = np.array([x[s.ndh : s.ndh + s.nq] for x in sol_xs])
+        sol_dts = sol_dts.full().flatten()
+        # print(np.shape(xdes))
+
+        t = s.cons.get_time_vec(sol_dts)
+        # print(t)
+        xnew, tnew = s.interpolate(xdes, t)
+        # print(tnew)
+        # print(np.shape(xnew))
+        # print(np.shape(tnew))
 
         while True:
-            # s.display_scene(s.q0, 1)
-            s.display_traj(xdes, 0.002)
-            xdes.reverse()
-            s.display_traj(xdes, 0.002)
-            xdes.reverse()
+            s.display_scene(s.q0, 1)
+            s.display_traj(xnew)
+
+    def interpolate(s, x, t) -> (np.ndarray, np.ndarray):
+        cumknots = 0
+        xnew = np.array([])
+        tnew = np.array([])
+        flag = True
+        for phase in s.cons.sequence:
+            tphase = t[phase.phase_name]
+            xphase = x[cumknots : cumknots + phase.knot_points]
+            tgrid_new = np.linspace(
+                tphase[0],
+                tphase[-1],
+                int((tphase[-1] - tphase[0]) / s.p.desired_frequency),
+            )
+            x_phase_new = np.array([])
+            for i in range(s.nq):
+                xi_phase_opt_new = np.array([])
+                if i < 3 or i > 6:
+                    f = interp1d(tphase, xphase[:, i], kind="cubic")
+                    xi_phase_opt_new = f(tgrid_new)
+                if i == 3:
+                    slerp = Slerp(tphase, R.from_quat(xphase[:, 3:7]))
+                    xi_phase_opt_new = np.transpose(slerp(tgrid_new).as_quat())
+                if i == 0:
+                    x_phase_new = xi_phase_opt_new
+                elif i <= 3 or i > 6:
+                    x_phase_new = np.vstack((x_phase_new, xi_phase_opt_new))
+            cumknots += phase.knot_points
+            if flag:
+                xnew = x_phase_new
+                tnew = tgrid_new
+                flag = False
+            else:
+                xnew = np.hstack((xnew, x_phase_new))
+                tnew = np.hstack((tnew, tgrid_new))
+        return xnew, tnew
 
     def display_scene(s, q: np.ndarray, dt=1e-1):
         """
@@ -621,9 +709,9 @@ class CentroidalTrajOpt:
         s.viz.display(q)
         time.sleep(dt)
 
-    def display_traj(s, qs: np.ndarray, dt=1e-1):
-        for q in qs[1:]:
-            s.display_scene(q, dt=dt)
+    def display_traj(s, qs: np.ndarray):
+        for k in range(np.size(qs,1)):
+            s.display_scene(qs[:,k], s.p.desired_frequency)
 
 
 from pinocchio.robot_wrapper import RobotWrapper
@@ -678,27 +766,72 @@ ee_left_foot = EndEffector(
 ee_right_foot = EndEffector(
     frame_name=r_name, frame_id=model.getFrameId(r_name), type_6D=True
 )
-phase1_period = 0.1
-phase_1_knot_points = 50
-phase_1_fixed_timing = phase1_period / phase_1_knot_points
-contacts_phase1 = frozendict({ee_left_foot: True, ee_right_foot: False})
+phase_period = 0.25
+phase_knot_points = 5
+phase_fixed_timing = phase_period / phase_knot_points
+contacts_phase1 = frozendict({ee_left_foot: True, ee_right_foot: True})
 phase1 = Phase(
     contacts=contacts_phase1,
     phase_name="phase_1",
-    fixed_timing=phase_1_fixed_timing,
-    knot_points=phase_1_knot_points,
+    fixed_timing=phase_fixed_timing,
+    knot_points=phase_knot_points,
+)
+phase_2_fixed_timing = phase_period / phase_knot_points
+contacts_phase2 = frozendict({ee_left_foot: True, ee_right_foot: False})
+phase2 = Phase(
+    contacts=contacts_phase2,
+    phase_name="phase_2",
+    fixed_timing=phase_fixed_timing,
+    knot_points=phase_knot_points,
 )
 
-# contacts_phase2 = frozendict({ee_left_foot: True, ee_right_foot: False})
+phase_3_fixed_timing = phase_period / phase_knot_points
+contacts_phase3 = frozendict({ee_left_foot: True, ee_right_foot: True})
+phase3 = Phase(
+    contacts=contacts_phase3,
+    phase_name="phase_3",
+    fixed_timing=phase_fixed_timing,
+    knot_points=phase_knot_points,
+)
 
-# phase2 = Phase(contacts=contacts_phase2, fixed_timing=0.002, knot_points=5)
+phase_4_fixed_timing = phase_period / phase_knot_points
+contacts_phase4 = frozendict({ee_left_foot: False, ee_right_foot: True})
+phase4 = Phase(
+    contacts=contacts_phase4,
+    phase_name="phase_4",
+    fixed_timing=phase_fixed_timing,
+    knot_points=phase_knot_points,
+)
+
+phase_5_fixed_timing = phase_period / phase_knot_points
+contacts_phase5 = frozendict({ee_left_foot: True, ee_right_foot: True})
+phase5 = Phase(
+    contacts=contacts_phase5,
+    phase_name="phase_5",
+    fixed_timing=phase_fixed_timing,
+    knot_points=phase_knot_points,
+)
+
+phase_6_fixed_timing = phase_period / phase_knot_points
+contacts_phase6 = frozendict({ee_left_foot: True, ee_right_foot: False})
+phase6 = Phase(
+    contacts=contacts_phase6,
+    phase_name="phase_6",
+    fixed_timing=phase_fixed_timing,
+    knot_points=phase_knot_points,
+)
 
 # Create a contact sequence and add phases
 contact_seq = ContactSequence()
 contact_seq.add_phase(phase1)
-# contact_seq.add_phase(phase2)
+contact_seq.add_phase(phase2)
+contact_seq.add_phase(phase3)
+# contact_seq.add_phase(phase4)
+# contact_seq.add_phase(phase5)
+# contact_seq.add_phase(phase6)
 
-collocation = PseudoSpectralCollocation(3)
+
+collocation = PseudoSpectralCollocation(1)
 
 traj_opt = CentroidalTrajOpt(model, data, viz, params, contact_seq, collocation)
 traj_opt.compute_casadi_graphs()
