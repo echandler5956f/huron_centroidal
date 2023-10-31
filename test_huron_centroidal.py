@@ -13,8 +13,8 @@ from src.trajopt import *
 
 builder = RobotWrapper.BuildFromURDF
 robot = builder(
-    "/home/quant/ros_ws/src/HURON-Model/huron_description/urdf/huron_cheat.urdf",
-    ["/home/quant/ros_ws/src/HURON-Model/huron_description"],
+    "$(find huron_description)/urdf/huron_cheat.urdf",
+    ["$(find huron_description)"],
     None,
 )
 
