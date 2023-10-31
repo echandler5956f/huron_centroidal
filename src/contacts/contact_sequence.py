@@ -41,6 +41,13 @@ class ContactSequence:
         phase = self.get_phase(k)
         return phase.contacts.get(end_effector, False)
 
+    def is_new_contact(self, k: int, end_effector: EndEffector) -> bool:
+        i = self.get_phase_idx(k)
+        if self.is_in_contact(end_effector, k) and i > 0:
+            if not self.sequence[i - 1].contacts[end_effector] and k - self.cumulative_knots[i - 1] == 0:
+                return True
+        return False
+
     # Get the frame id from an end effector object (used with pinocchio)
     def get_frame_id(self, end_effector: EndEffector) -> int:
         return end_effector.frame_id

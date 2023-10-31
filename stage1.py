@@ -44,6 +44,10 @@ class SimpleInterface:
         pin.centerOfMass(self.model, self.data, q, False)
         return self.data.com[0]
     
+    def get_vcom(self, q, v):
+        pin.centerOfMass(self.model, self.data, q, v, False)
+        return self.data.vcom[0]
+    
     def get_A(self, q):
         pin.computeCentroidalMap(self.model, self.data, q)
         return self.data.Ag

@@ -122,6 +122,13 @@ class CentroidalTrajOpt:
         # Polynomial v: nv x 1
         s.cvp = s.cxp[s.ndh + s.nq :]
 
+        # 3D vector helper
+        s.c3vec = ca.SX.sym("3vec", 3, 1)
+        # Quaternion vector helper
+        s.cqvec = ca.SX.sym("qvec", 4, 1)
+        # 6D vector helper
+        s.c6vec = ca.SX.sym("6vec", 6, 1)
+
         # Time helper variable
         s.cdt = ca.SX.sym("dt", 1, 1)
 
@@ -172,70 +179,6 @@ class CentroidalTrajOpt:
             ["xdot"],
         )
 
-        # Running cost
-        s.L = ca.Function(
-            "running_cost",
-            [s.cx, s.cu, s.cvju],
-            [
-                1e-3 * ca.sumsqr(s.cvju)
-                + 1e-4 * ca.sumsqr(s.cf)
-                + 1e-4 * ca.sumsqr(s.ctau)
-                + 1e1 * ca.sumsqr(s.cqj - s.q0[7:])
-            ],
-            ["x", "u", "vju"],
-            ["L"],
-        )
-
-        # Error in contact position
-        s.dpcontacts = {}
-        # Error in contact velocity
-        s.vcontacts = {}
-
-        for ee in s.cons.get_all_end_effectors():
-            if not ee.type_6D:
-                p0 = s.data.oMf[ee.frame_id].translation.copy()
-                s.dpcontacts[ee.frame_name] = ca.Function(
-                    f"dpcontact_{ee.frame_name}",
-                    [s.cx],
-                    [-(s.cdata.oMf[ee.frame_id].inverse().act(ca.SX(p0)))],
-                    ["x"],
-                    ["3D_pos_error"],
-                )
-                s.vcontacts[ee.frame_name] = ca.Function(
-                    f"vcontact_{ee.frame_name}",
-                    [s.cx],
-                    [
-                        cpin.getFrameVelocity(
-                            s.cmodel, s.cdata, ee.frame_id, pin.LOCAL
-                        ).linear
-                    ],
-                    ["x"],
-                    ["3D_vel_error"],
-                )
-            else:
-                p0 = s.data.oMf[ee.frame_id]
-                s.dpcontacts[ee.frame_name] = ca.Function(
-                    f"dpcontact_{ee.frame_name}",
-                    [s.cx],
-                    [np.zeros(6)],
-                    ["x"],
-                    ["6D_pos_error"],
-                )
-                s.vcontacts[ee.frame_name] = ca.Function(
-                    f"vcontact_{ee.frame_name}",
-                    [s.cx],
-                    [
-                        cpin.getFrameVelocity(
-                            s.cmodel, s.cdata, ee.frame_id, pin.LOCAL
-                        ).vector
-                    ],
-                    [""],
-                    ["6D_vel_error"],
-                )
-
-        # Get initial contact position
-        pin.framesForwardKinematics(s.model, s.data, s.q0)
-
         # Helper function to get past casadi MX->SX syntax
         s.tau_cross = {
             ee.frame_name: ca.Function(
@@ -252,6 +195,24 @@ class CentroidalTrajOpt:
             )
             for ee in s.cons.get_all_end_effectors()
         }
+
+        # Running cost:
+        # 1. Joint velocity
+        # 2. Contact forces
+        # 3. Contact Wrenches
+        # 4. Deviation from nominal configuration
+        s.L = ca.Function(
+            "running_cost",
+            [s.cx, s.cu, s.cvju],
+            [
+                1e-3 * ca.sumsqr(s.cvju)
+                + 1e-4 * ca.sumsqr(s.cf)
+                + 1e-4 * ca.sumsqr(s.ctau)
+                + 1e1 * ca.sumsqr(s.cqj - s.q0[7:])
+            ],
+            ["x", "u", "vju"],
+            ["L"],
+        )
 
         # Final configuration cost (should only be active for one end effector)
         s.M = {
@@ -272,6 +233,57 @@ class CentroidalTrajOpt:
             for ee in s.cons.get_all_end_effectors()
         }
 
+        # Error in contact position
+        s.dpcontacts = {}
+        # Error in contact velocity
+        s.vcontacts = {}
+
+        for ee in s.cons.get_all_end_effectors():
+            if not ee.type_6D:
+                s.dpcontacts[ee.frame_name] = ca.Function(
+                    f"dpcontact_{ee.frame_name}",
+                    [s.cx, s.c3vec],
+                    [(s.cdata.oMf[ee.frame_id].translation() - s.c3vec)],
+                    ["x", "pose_des"],
+                    ["3D_pos_error"],
+                )
+                s.vcontacts[ee.frame_name] = ca.Function(
+                    f"vcontact_{ee.frame_name}",
+                    [s.cx, s.c3vec],
+                    [
+                        cpin.getFrameVelocity(
+                            s.cmodel, s.cdata, ee.frame_id, pin.LOCAL
+                        ).linear
+                        - s.c3vec
+                    ],
+                    ["x", "vel_des"],
+                    ["3D_vel_error"],
+                )
+            else:
+                s.dpcontacts[ee.frame_name] = ca.Function(
+                    f"dpcontact_{ee.frame_name}",
+                    [s.cx, s.c3vec, s.cqvec],
+                    [
+                        cpin.log6(
+                            s.cdata.oMf[ee.frame_id].inverse() * cpin.SE3(s.cqvec, s.c3vec)
+                        ).vector
+                    ],
+                    ["x", "pose_des"],
+                    ["6D_pos_error"],
+                )
+                s.vcontacts[ee.frame_name] = ca.Function(
+                    f"vcontact_{ee.frame_name}",
+                    [s.cx, s.c6vec],
+                    [
+                        cpin.getFrameVelocity(
+                            s.cmodel, s.cdata, ee.frame_id, pin.LOCAL
+                        ).vector
+                        - s.c6vec
+                    ],
+                    ["x", "vel_des"],
+                    ["6D_vel_error"],
+                )
+
         s.z_foot = {
             ee.frame_name: ca.Function(
                 f"z_foot_{ee.frame_name}",
@@ -284,7 +296,7 @@ class CentroidalTrajOpt:
         }
 
     # Setup the optimization problem using casadi
-    def setup_problem(s):
+    def solve_problem(s):
         opti = ca.Opti()
         x0 = np.concatenate([np.zeros(s.ndh), s.q0, np.zeros(s.nv)])
         # Small deviations from the initial state

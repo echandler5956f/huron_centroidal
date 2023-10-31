@@ -62,7 +62,7 @@ ee_right_foot = EndEffector(
     frame_name=r_name, frame_id=model.getFrameId(r_name), type_6D=True
 )
 phase_1_period = 0.25
-phase_1_knot_points = 5
+phase_1_knot_points = 25
 phase_1_fixed_timing = phase_1_period / phase_1_knot_points
 contacts_phase1 = frozendict({ee_left_foot: True, ee_right_foot: True})
 phase1 = Phase(
@@ -72,7 +72,7 @@ phase1 = Phase(
     knot_points=phase_1_knot_points,
 )
 phase_2_period = 0.25
-phase_2_knot_points = 5
+phase_2_knot_points = 25
 phase_2_fixed_timing = phase_2_period / phase_2_knot_points
 contacts_phase2 = frozendict({ee_left_foot: True, ee_right_foot: False})
 phase2 = Phase(
@@ -81,7 +81,7 @@ phase2 = Phase(
     fixed_timing=phase_2_fixed_timing,
     knot_points=phase_2_knot_points,
 )
-phase_3_period = 0.01
+phase_3_period = 0.05
 phase_3_knot_points = 5
 phase_3_fixed_timing = phase_3_period / phase_3_knot_points
 contacts_phase3 = frozendict({ee_left_foot: True, ee_right_foot: True})
@@ -96,12 +96,11 @@ phase3 = Phase(
 contact_seq = ContactSequence()
 contact_seq.add_phase(phase1)
 contact_seq.add_phase(phase2)
-# contact_seq.add_phase(phase3)
-
+contact_seq.add_phase(phase3)
 
 collocation = PseudoSpectralCollocation(1)
 
 traj_opt = CentroidalTrajOpt(model, data, viz, params, contact_seq, collocation)
 traj_opt.compute_casadi_graphs()
 print("Finished computing casadi graphs")
-traj_opt.setup_problem()
+traj_opt.solve_problem()
