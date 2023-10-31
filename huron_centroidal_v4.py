@@ -172,7 +172,7 @@ class Parameters:
         # Problem options for casadi
         s.p_opts = {"expand": True}
         # Solver options for casadi
-        s.s_opts = {"max_iter": 50, "linear_solver": "ma97"}
+        s.s_opts = {"max_iter": 1, "linear_solver": "ma97"}
 
 
 # Main optimization class
@@ -754,7 +754,7 @@ ee_right_foot = EndEffector(
     frame_name=r_name, frame_id=model.getFrameId(r_name), type_6D=True
 )
 phase_1_period = 0.25
-phase_1_knot_points = 50
+phase_1_knot_points = 5
 phase_1_fixed_timing = phase_1_period / phase_1_knot_points
 contacts_phase1 = frozendict({ee_left_foot: True, ee_right_foot: True})
 phase1 = Phase(
@@ -764,7 +764,7 @@ phase1 = Phase(
     knot_points=phase_1_knot_points,
 )
 phase_2_period = 0.25
-phase_2_knot_points = 50
+phase_2_knot_points = 5
 phase_2_fixed_timing = phase_2_period / phase_2_knot_points
 contacts_phase2 = frozendict({ee_left_foot: True, ee_right_foot: False})
 phase2 = Phase(
