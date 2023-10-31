@@ -1,5 +1,3 @@
-#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
-
 import numpy as np
 import casadi as ca
 

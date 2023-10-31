@@ -1,4 +1,4 @@
-#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
+#!.venv/bin/python3
 
 import rospy
 from std_msgs.msg import Float64MultiArray

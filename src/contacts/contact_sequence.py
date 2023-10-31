@@ -1,5 +1,3 @@
-#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
-
 from src.contacts.end_effector import EndEffector
 from src.contacts.phase import Phase
 from collections import defaultdict

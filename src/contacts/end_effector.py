@@ -1,5 +1,3 @@
-#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
-
 from dataclasses import dataclass
 
 

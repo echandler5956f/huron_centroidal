@@ -1,4 +1,4 @@
-#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
+#!.venv/bin/python3
 
 from gazebo_msgs.srv import SetModelConfiguration, SetModelConfigurationRequest, SetModelState, SetModelStateRequest
 from gazebo_msgs.msg import ModelState

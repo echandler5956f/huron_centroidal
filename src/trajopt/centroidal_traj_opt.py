@@ -1,5 +1,3 @@
-#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
-
 from src.trajopt.peudospectral_collocation import PseudoSpectralCollocation
 from src.trajopt.parameters import Parameters
 from src.contacts import *

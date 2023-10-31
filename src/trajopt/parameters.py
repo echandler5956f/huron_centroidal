@@ -1,5 +1,3 @@
-#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
-
 from numpy import array
 
 # Simple parameters storage
