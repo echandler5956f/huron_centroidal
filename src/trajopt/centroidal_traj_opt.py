@@ -1,4 +1,5 @@
 from src.trajopt.peudospectral_collocation import PseudoSpectralCollocation
+from src.trajopt.model_symbols import ModelSymbols
 from src.trajopt.parameters import Parameters
 from src.contacts import *
 
@@ -23,14 +24,12 @@ class CentroidalTrajOpt:
         viz: MeshcatVisualizer,
         params: Parameters,
         contact_sequence: ContactSequence,
-        collocation: PseudoSpectralCollocation,
     ):
         s.model = model
         s.data = data
         s.viz = viz
         s.p = params
         s.cons = contact_sequence
-        s.col = collocation
         s.q0 = s.p.q0
         pin.computeTotalMass(s.model, s.data)
         pin.framesForwardKinematics(s.model, s.data, s.q0)
@@ -48,11 +47,13 @@ class CentroidalTrajOpt:
 
         s.display_scene(s.q0)
 
-        s.m = s.data.mass[0]
+        s.mass = s.data.mass[0]
         s.N = s.cons.cumulative_knots[-1]
 
         s.cmodel = cpin.Model(s.model)
         s.cdata = s.cmodel.createData()
+
+        s.col = PseudoSpectralCollocation(s.p.degree)
 
         # Size of joint position vector
         s.nq = s.model.nq
@@ -163,12 +164,12 @@ class CentroidalTrajOpt:
             [
                 ca.vertcat(
                     s.cdh,
-                    (s.cf - s.m * s.p.g) / s.m,
-                    (s.ctau) / s.m,
+                    (s.cf - s.mass * s.p.g) / s.mass,
+                    (s.ctau) / s.mass,
                     s.cv,
                     ca.mtimes(
                         ca.inv(Ag[:, :6]),
-                        (s.m * s.ch - ca.mtimes(Ag[:, 6:], s.cvju)),
+                        (s.mass * s.ch - ca.mtimes(Ag[:, 6:], s.cvju)),
                     ),
                     s.cvju,
                 )
@@ -231,21 +232,12 @@ class CentroidalTrajOpt:
             for ee in s.cons.get_all_end_effectors()
         }
 
-        # Error in contact position
+        # Contact position
         s.dpcontacts = {}
         # Contact velocity
         s.vcontacts = {}
-        # Velocity constraint corrector
-        s.baumgart = {}
         for ee in s.cons.get_all_end_effectors():
             if not ee.type_6D:
-                s.dpcontacts[ee.frame_name] = ca.Function(
-                    f"dpcontact_{ee.frame_name}",
-                    [s.cx, s.c3vec],
-                    [(s.cdata.oMf[ee.frame_id].translation() - s.c3vec)],
-                    ["x", "pos_des"],
-                    ["3D_pos_error"],
-                )
                 s.vcontacts[ee.frame_name] = ca.Function(
                     f"vcontact_{ee.frame_name}",
                     [s.cx],
@@ -257,25 +249,15 @@ class CentroidalTrajOpt:
                     ["x"],
                     ["3D_vel_error"],
                 )
-                s.baumgart[ee.frame_name] = ca.Function(
-                    f"boumgart_{ee.frame_name}",
-                    [s.cx, s.c3vec],
-                    [
-                        s.vcontacts[ee.frame_name](s.cx)
-                        + s.p.Kp * s.dpcontacts[ee.frame_name](s.cx, s.c3vec)
-                    ],
-                    ["x", "pos_des"],
-                    ["3D_corrector"],
-                )
             else:
                 s.dpcontacts[ee.frame_name] = ca.Function(
                     f"dpcontact_{ee.frame_name}",
-                    [s.cx, s.cqvec, s.c3vec],
+                    [s.cx],
                     [
-                        cpin.log6(s.cdata.oMf[ee.frame_id].inverse() * cpin.SE3(s.cqvec, s.c3vec)).vector
+                        s.cdata.oMf[ee.frame_id].translation[2]
                     ],
-                    ["x", "quat_des", "pos_des"],
-                    ["6D_pos_error"],
+                    ["x"],
+                    ["z"],
                 )
                 s.vcontacts[ee.frame_name] = ca.Function(
                     f"vcontact_{ee.frame_name}",
@@ -287,16 +269,6 @@ class CentroidalTrajOpt:
                     ],
                     ["x"],
                     ["6D_vel_error"],
-                )
-                s.baumgart[ee.frame_name] = ca.Function(
-                    f"boumgart_{ee.frame_name}",
-                    [s.cx, s.cqvec, s.c3vec],
-                    [
-                        s.vcontacts[ee.frame_name](s.cx)
-                        + s.p.Kp * s.dpcontacts[ee.frame_name](s.cx, s.c3vec)
-                    ],
-                    ["x", "quat_des", "pos_des"],
-                    ["6D_corrector"],
                 )
 
     # Setup the optimization problem using casadi
@@ -318,8 +290,6 @@ class CentroidalTrajOpt:
         # This list can contain either casadi variables or numpy zeros,
         # depending on if the end effector is in contact at a certain knot point
         us = defaultdict(list)
-        # Maps an end effector to a list of foot positions at the start of stance phase
-        foot_pose = defaultdict(list)
         # The centroidal dynamics model assumes we have 'sufficient control authority' and thus we do not care about the joint torques-
         # we consider the joint velocities (var_js) to be the inputs to the system, since with 'sufficient control authority' we can always map any
         # joint acceleration to an associated joint torque using inverse dynamics
@@ -336,24 +306,10 @@ class CentroidalTrajOpt:
         for ee in s.cons.get_all_end_effectors():
             # Initialize the list
             us[ee.frame_name] = []
-            foot_pose[ee.frame_name] = []
             for k in range(s.N):
                 i = s.cons.get_phase_idx(k)
                 # 6 DOF contact or 3 DOF contact
                 legsize = s.cons.get_contact_size(ee)
-                if s.cons.is_new_contact(k, ee):
-                    cpin.framesForwardKinematics(
-                        s.cmodel, s.cdata, var_xs[k][s.ndh : s.ndh + s.nq]
-                    )
-                    if s.cons.get_contact_type(ee):
-                        foot_pose[ee.frame_name].append = s.cdata.oMf[
-                            ee.frame_id
-                        ].copy()
-                    else:
-                        foot_pose[ee.frame_name].append = (
-                            s.cdata.oMf[ee.frame_id].copy().translation()
-                        )
-                    cpin.framesForwardKinematics(s.cmodel, s.cdata, s.q0)
                 if s.cons.is_in_contact(ee, k):
                     u = opti.variable(legsize)
                     var_us.append(u)
@@ -397,7 +353,8 @@ class CentroidalTrajOpt:
                     grf += F[:3]
                     tau += s.tau_cross[ee.frame_name](x_k, F)
                     # Add all the contact constraints:
-
+                    # Zero velocity at the contact point
+                    opti.subject_to(s.vcontacts[ee.frame_name](x_k) == 0)
                     # Friction cone approximation constraint
                     opti.subject_to(F[0] / F[2] > -s.p.mu)
                     opti.subject_to(F[0] / F[2] < s.p.mu)
@@ -409,28 +366,13 @@ class CentroidalTrajOpt:
                     # Set the initial guess for the force variable
                     # (an initial guess of 0 is infeasible because of the friction cone constraints)
                     opti.set_initial(
-                        F[2], s.m * s.p.g[2] / s.cons.get_num_stance_during_phase(i)
+                        F[2], s.mass * s.p.g[2] / s.cons.get_num_stance_during_phase(i)
                     )
-                    fpose = foot_pose[ee.frame_name][i]
                     if s.cons.get_contact_type(ee):
                         tau += F[3:]
-                        # Zero velocity at the contact point
-                        opti.subject_to(
-                            s.baumgart[ee](x_k, fpose.rotation(), fpose.translation())
-                            == 0
-                        )
-                    else:
-                        # Zero velocity at the contact point
-                        opti.subject_to(s.baumgart[ee](x_k, fpose) == 0)
                 else:
-                    kphase = k
-                    if i > 0:
-                        kphase = k - s.cons.cumulative_knots[i - 1]
                     # Add swing constraints
-                    # if kphase == phase.knot_points / 2:
-                    #     opti.subject_to(s.swing_p[ee.frame_name](x_k) == 0)
-                    # opti.subject_to(s.swing_v[ee.frame_name](x_k) == 0)
-                    # opti.subject_to(s.z_foot[ee.frame_name](x_k) >= 0)
+                    opti.subject_to(s.dpcontacts[ee.frame_name](x_k) >= 0)
             # Stack the total ground reaction force and contact wrench
             u_k = ca.vertcat(grf, tau)
             # Get the joint velocities at the current knot point

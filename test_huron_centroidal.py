@@ -13,8 +13,8 @@ from src.trajopt import *
 
 builder = RobotWrapper.BuildFromURDF
 robot = builder(
-    "$(find huron_description)/urdf/huron_cheat.urdf",
-    ["$(find huron_description)"],
+    "/home/quant/ros_ws/src/HURON-Model/huron_description/urdf/huron_cheat.urdf",
+    ["/home/quant/ros_ws/src/HURON-Model/huron_description"],
     None,
 )
 
@@ -96,11 +96,9 @@ phase3 = Phase(
 contact_seq = ContactSequence()
 contact_seq.add_phase(phase1)
 contact_seq.add_phase(phase2)
-contact_seq.add_phase(phase3)
+# contact_seq.add_phase(phase3)
 
-collocation = PseudoSpectralCollocation(1)
-
-traj_opt = CentroidalTrajOpt(model, data, viz, params, contact_seq, collocation)
+traj_opt = CentroidalTrajOpt(model, data, viz, params, contact_seq)
 traj_opt.compute_casadi_graphs()
 print("Finished computing casadi graphs")
 traj_opt.solve_problem()

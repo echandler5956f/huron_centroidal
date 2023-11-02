@@ -15,6 +15,8 @@ class Parameters:
         s.swing_height = 0.15
         # Frequency to interpolate the solution to
         s.desired_frequency = 0.01
+        # Degree of interpolating polynomial
+        s.degree = 1
         # Problem options for casadi
         s.p_opts = {"expand": True}
         # Solver options for casadi
