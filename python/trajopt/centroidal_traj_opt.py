@@ -1,7 +1,7 @@
-from src.trajopt.peudospectral_collocation import PseudoSpectralCollocation
-from src.trajopt.model_symbols import ModelSymbols
-from src.trajopt.parameters import Parameters
-from src.contacts import *
+from trajopt.peudospectral_collocation import PseudoSpectralCollocation
+from trajopt.model_symbols import ModelSymbols
+from trajopt.parameters import Parameters
+from contacts import *
 
 from collections import defaultdict
 import time
@@ -9,7 +9,7 @@ import numpy as np
 import casadi as ca
 import pinocchio as pin
 from pinocchio import casadi as cpin
-from src.meshcat_viewer_wrapper import MeshcatVisualizer
+from meshcat_viewer_wrapper import MeshcatVisualizer
 from scipy.interpolate import interp1d
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp

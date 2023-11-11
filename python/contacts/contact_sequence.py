@@ -1,5 +1,5 @@
-from src.contacts.end_effector import EndEffector
-from src.contacts.phase import Phase
+from contacts.end_effector import EndEffector
+from contacts.phase import Phase
 from collections import defaultdict
 from typing import List
 

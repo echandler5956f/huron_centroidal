@@ -1,6 +1,6 @@
 import doctest
 
-from src.meshcat_viewer_wrapper import colors
+from meshcat_viewer_wrapper import colors
 
 
 def load_tests(loader, tests, pattern):

@@ -1,14 +1,13 @@
 #!.venv/bin/python3
 
-
 import numpy as np
 import casadi as ca
 from frozendict import frozendict
-from src.meshcat_viewer_wrapper import MeshcatVisualizer
+from meshcat_viewer_wrapper import MeshcatVisualizer
 from pinocchio.robot_wrapper import RobotWrapper
 
-from src.contacts import *
-from src.trajopt import *
+from contacts import *
+from trajopt import *
 
 
 builder = RobotWrapper.BuildFromURDF

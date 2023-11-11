@@ -9,7 +9,7 @@ import casadi as ca
 import pinocchio as pin
 from dataclasses import dataclass
 from pinocchio import casadi as cpin
-from src.meshcat_viewer_wrapper import MeshcatVisualizer
+from meshcat_viewer_wrapper import MeshcatVisualizer
 from scipy.interpolate import interp1d
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial.transform import Slerp

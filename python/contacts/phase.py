@@ -1,4 +1,4 @@
-from src.contacts.end_effector import EndEffector
+from contacts.end_effector import EndEffector
 from frozendict import frozendict
 from dataclasses import dataclass
 
