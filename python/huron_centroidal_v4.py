@@ -705,8 +705,8 @@ from pinocchio.robot_wrapper import RobotWrapper
 
 builder = RobotWrapper.BuildFromURDF
 robot = builder(
-    "/home/quant/ros_ws/src/HURON-Model/huron_description/urdf/huron_cheat.urdf",
-    ["/home/quant/ros_ws/src/HURON-Model/huron_description"],
+    "resources/urdf/huron_cheat.urdf",
+    ["resources"],
     None,
 )
 

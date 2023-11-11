@@ -26,8 +26,8 @@ class SimpleInterface:
         # --- Load robot model
         builder = RobotWrapper.BuildFromURDF
         self.robot = builder(
-            "/home/quant/ros_ws/src/HURON-Model/huron_description/urdf/huron_cheat.urdf",
-            ["/home/quant/ros_ws/src/HURON-Model/huron_description"],
+            "resources/urdf/huron_cheat.urdf",
+            ["resources"],
             None,
         )
         self.robot.q0 = np.array([0, 0, 1.0627, 0, 0, 0, 1,

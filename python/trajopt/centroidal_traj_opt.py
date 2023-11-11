@@ -1,7 +1,9 @@
 from trajopt.peudospectral_collocation import PseudoSpectralCollocation
 from trajopt.model_symbols import ModelSymbols
 from trajopt.parameters import Parameters
-from contacts import *
+from contacts.phase import Phase
+from contacts.end_effector import EndEffector
+from contacts.contact_sequence import ContactSequence
 
 from collections import defaultdict
 import time
