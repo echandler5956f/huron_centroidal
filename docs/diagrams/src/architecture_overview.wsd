@@ -28,10 +28,12 @@ class ContactSequence {
 class State {
 }
 
-class CentroidalState {
+class CollocationPoint {
     x: Scalar[]
     dx: Scalar[]
     u: Scalar[]
+
+    knot_phase: *KnotPhase
 }
 
 class Trajectory {
@@ -47,6 +49,7 @@ class LeggedRobot {
 
 class Constraints {
     symbolic_state: *CentroidalState<SX>
+    casadi_function: Casadi::Function //IDK
 }
 
 class Objective {
@@ -59,6 +62,11 @@ class Interpolate {
     quadrature_coefficients: float[]
     tau_root: float[]
     compute_matrices(degree: int, scheme: int): void
+}
+
+class KnotPhase {
+    centroidal_state_points: CentroidalState<Scalar>[]
+    control_input_points: ControlInput<Scalar>[]
 }
 
 class NLP {
