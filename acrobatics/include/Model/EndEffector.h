@@ -2,6 +2,8 @@
 #include <memory>
 #include <map>
 
+#include <pinocchio/fwd.hpp>
+
 namespace acrobatics
 {
     namespace contact
@@ -11,7 +13,9 @@ namespace acrobatics
             // The name of the end effector frame in pinocchio. Used as the key pair in global end effector maps.
             std::string frame_name;
             // The id of the frame in pinocchio
-            int frame_id;
+            pinocchio::FrameIndex frame_id;
+            // The ID the end effector is reffered to by in the vector of ee's.
+            int local_ee_idx;
 
             // Is 6-DOF or is 3-DOF
             bool is_6d;
