@@ -6,29 +6,32 @@ namespace acro
     {
         class Trajectory
         {
-            public:
-                Trajectory();
-            private:
-                /*A Trajectory is made up of pseudospectral finite elements*/
-                std::vector<PseudospectralSegment> trajectory;
+        public:
+            Trajectory();
 
-                /* 
-                Continuous-time functions:
-                    Fint: The decision variables are infinitesimal deviations from the initial state, 
-                    allowing for states to lie on a manifold. Fint is the function which maps these 
-                    deviations back to the actual state space.
+        private:
+            /*A Trajectory is made up of pseudospectral finite elements*/
+            std::vector<PseudospectralSegment> trajectory;
 
-                    F: The system dynamics.
+            /*
+            Continuous-time functions:
+                Fint: The decision variables are infinitesimal deviations from the initial state,
+                allowing for states to lie on a manifold. Fint is the function which maps these
+                deviations back to the actual state space.
 
-                    L: The 'running', or integrated cost.
+                F: The system dynamics.
 
-                    Phi: The terminal cost.
-                */
-                casadi::Function Fint;
-                casadi::Function F;
-                casadi::Function L;
-                casadi::Function Phi;
-                
+                L: The 'running', or integrated cost.
+
+                Phi: The terminal cost.
+            */
+            casadi::Function Fint;
+            casadi::Function F;
+            casadi::Function L;
+            casadi::Function Phi;
+
+            /*Fixed time horizon*/
+            double T;
         };
     }
 }

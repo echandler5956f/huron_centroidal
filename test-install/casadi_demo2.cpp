@@ -1,8 +1,3 @@
-/**
-   Demonstration on how to construct a fixed-step implicit Runge-Kutta integrator
-   @author: Joel Andersson, KU Leuven 2013
-*/
-
 #include <pinocchio/autodiff/casadi.hpp>
 #include <iostream>
 #include <vector>
