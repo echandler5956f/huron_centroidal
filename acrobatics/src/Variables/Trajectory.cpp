@@ -2,5 +2,4 @@
 
 acro::variables::Trajectory::Trajectory()
 {
-    
 }

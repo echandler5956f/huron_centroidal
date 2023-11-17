@@ -7,14 +7,15 @@ namespace acro
     {
         class KnotSegment
         {
-            public:
-                KnotSegment();
-            private:
-                // Actual decision variables
-                std::vector<casadi::SX> Xc_var;
-                std::vector<casadi::SX> U_var;
-                casadi::SX X0_var;
-                casadi::SX Xf_expr;
+        public:
+            KnotSegment();
+
+        private:
+            // Actual decision variables
+            std::vector<casadi::SX> Xc_var;
+            std::vector<casadi::SX> U_var;
+            casadi::SX X0_var;
+            casadi::SX Xf_expr;
         };
     }
 }

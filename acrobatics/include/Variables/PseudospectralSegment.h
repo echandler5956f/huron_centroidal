@@ -6,34 +6,35 @@ namespace acro
     {
         class PseudospectralSegment
         {
-            public:
-                PseudospectralSegment();
+        public:
+            PseudospectralSegment();
 
-                static void compute_collocation_matrices(int d, Eigen::VectorXd &B, Eigen::MatrixXd &C, Eigen::VectorXd &D, const std::string &scheme = "radau");
-            private:
-                /*A pseudospectral finite element is made up of knot segments*/
-                std::vector<KnotSegment> traj_segment;
+            static void compute_collocation_matrices(int d, Eigen::VectorXd &B, Eigen::MatrixXd &C, Eigen::VectorXd &D, const std::string &scheme = "radau");
 
-                /* 
-                Implicit discrete-time functions:
-                    collocation_constraint_map: This function map returns the vector of collocation equations 
-                    necessary to match the derivative defect between the approximated dynamics and actual system 
-                    dynamics.
+        private:
+            /*A pseudospectral finite element is made up of knot segments*/
+            std::vector<KnotSegment> traj_segment;
 
-                    xf_constraint_map: The map which matches the approximated final state expression with the initial 
-                    state of the next segment
+            /*
+            Implicit discrete-time functions:
+                collocation_constraint_map: This function map returns the vector of collocation equations
+                necessary to match the derivative defect between the approximated dynamics and actual system
+                dynamics.
 
-                    q_cost_fold: The accumulated cost across all the knot segments found using quadrature rules.
-                */
-                casadi::Function collocation_constraint_map;
-                casadi::Function xf_constraint_map;
-                casadi::Function q_cost_fold;
+                xf_constraint_map: The map which matches the approximated final state expression with the initial
+                state of the next segment
 
-                // Variables used to build the expression graphs
-                std::vector<casadi::SX> Xc;
-                std::vector<casadi::SX> U;
-                casadi::SX X0;
-                casadi::SX Lc;
+                q_cost_fold: The accumulated cost across all the knot segments found using quadrature rules.
+            */
+            casadi::Function collocation_constraint_map;
+            casadi::Function xf_constraint_map;
+            casadi::Function q_cost_fold;
+
+            // Variables used to build the expression graphs
+            std::vector<casadi::SX> Xc;
+            std::vector<casadi::SX> U;
+            casadi::SX X0;
+            casadi::SX Lc;
         };
     }
 }

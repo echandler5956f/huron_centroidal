@@ -1,4 +1,4 @@
 .vscode*
 .venv/
 build/
-install-test/build/
+test-install/build/
