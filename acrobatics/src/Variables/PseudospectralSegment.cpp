@@ -1,6 +1,23 @@
 #include "Variables/PseudospectralSegment.h"
 
-acro::variables::PseudospectralSegment::PseudospectralSegment()
+acro::variables::PseudospectralSegment::PseudospectralSegment(contact::ContactCombination contact_combination)
+    : contact_combination_(contact_combination)
+{
+    InitMask();
+    InitConstraints();
+}
+
+void acro::variables::PseudospectralSegment::InitMask()
+{
+    int num_end_effectors = contact_combination_.size();
+    contact_mask_ = Eigen::VectorXd::Zero(num_end_effectors);
+    for (int i = 0; i < num_end_effectors; i++)
+    {
+        contact_mask_[i] = contact_combination_[i].second;
+    }
+}
+
+void acro::variables::PseudospectralSegment::InitConstraints()
 {
 }
 

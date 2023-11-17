@@ -1,7 +1,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
-namespace acrobatics
+namespace acro
 {
     namespace environment
     {

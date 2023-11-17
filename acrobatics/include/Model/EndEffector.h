@@ -4,7 +4,7 @@
 
 #include <pinocchio/fwd.hpp>
 
-namespace acrobatics
+namespace acro
 {
     namespace contact
     {

@@ -2,7 +2,7 @@
 
 #include <pinocchio/multibody/model.hpp>
 #include <vector>
-namespace acrobatics
+namespace acro
 {
     namespace contact
     {
