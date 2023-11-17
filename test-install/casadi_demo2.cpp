@@ -6,22 +6,31 @@
 #include <pinocchio/autodiff/casadi.hpp>
 #include <iostream>
 #include <vector>
+#include <string>
 
 using namespace casadi;
 using namespace std;
 
-int main(int argc, char *argv[])
+int main(int argc, char** argv)
 {
   // Degree of interpolating polynomial
-  const int d = 3;
-  
+  int d = 3;
+
+  if (argc > 1) {
+    d = std::atoi(argv[1]);
+    std::cout << "Used arg" << std::endl;
+  }
+  else {
+    std::cout << "Did not use arg" << std::endl;
+  }
+
   // Choose collocation points
-  auto troot = collocation_points(d, "legendre");
+  auto troot = collocation_points(d, "radau");
   troot.insert(troot.begin(), 0);
   Eigen::VectorXd tau_root = Eigen::Map<Eigen::VectorXd>(troot.data(), troot.size());
 
   // Coefficients of the collocation equation
-  Eigen::Matrix<double, d + 1, d + 1> C;
+  Eigen::MatrixXd C(d + 1, d + 1);
 
   // Coefficients of the continuity equation
   Eigen::VectorXd D(d + 1);
@@ -42,7 +51,6 @@ int main(int argc, char *argv[])
         p *= Polynomial(-tau_root(r), 1) / (tau_root(j) - tau_root(r));
       }
     }
-
     // Evaluate the polynomial at the final time to get the coefficients of the continuity equation
     D(j) = p(1.0);
 

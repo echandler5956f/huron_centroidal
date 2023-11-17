@@ -8,6 +8,8 @@ namespace acro
         {
             public:
                 PseudospectralSegment();
+
+                static void compute_collocation_matrices(int d, Eigen::VectorXd &B, Eigen::MatrixXd &C, Eigen::VectorXd &D, const std::string &scheme = "radau");
             private:
                 /*A pseudospectral finite element is made up of knot segments*/
                 std::vector<KnotSegment> traj_segment;
