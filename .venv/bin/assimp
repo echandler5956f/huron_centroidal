@@ -1,3 +1,0 @@
-#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
-from cmeel.run import cmeel_run
-cmeel_run()
