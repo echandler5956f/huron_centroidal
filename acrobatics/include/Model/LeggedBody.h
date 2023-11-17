@@ -1,4 +1,4 @@
-#include "EndEffector.h"
+#include "Model/EndEffector.h"
 
 #include <pinocchio/multibody/model.hpp>
 #include <vector>

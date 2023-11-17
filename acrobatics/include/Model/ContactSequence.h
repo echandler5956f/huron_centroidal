@@ -1,4 +1,4 @@
-#include "EndEffector.h"
+#include "Model/EndEffector.h"
 namespace acrobatics
 {
     namespace contact

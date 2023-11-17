@@ -1,4 +1,5 @@
 #include <string>
+#include <memory>
 #include <map>
 
 namespace acrobatics
@@ -17,8 +18,8 @@ namespace acrobatics
         };
 
         // We use a ptr so that there is only ever one instance of the end effector.
-        typedef RobotEndEffectors std::map<std::string, std::shared_ptr<EndEffector>>;
+        typedef std::map<std::string, std::shared_ptr<EndEffector>> RobotEndEffectors;
 
-        typedef ContactCombination std::map<std::string, bool>;
+        typedef std::map<std::string, bool> ContactCombination;
     }
 }
