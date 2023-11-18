@@ -13,7 +13,7 @@ namespace acro
             // The name of the end effector frame in pinocchio. Used as the key pair in global end effector maps.
             std::string frame_name;
             // The id of the frame in pinocchio
-            pinocchio::FrameIndex frame_id;
+            // pinocchio::FrameIndex frame_id;
             // The ID the end effector is reffered to by in the vector of ee's.
             int local_ee_idx;
 

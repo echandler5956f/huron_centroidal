@@ -11,13 +11,13 @@ int main(int argc, char** argv)
   // Degree of interpolating polynomial
   int d = 3;
 
-  if (argc > 1) {
-    d = std::atoi(argv[1]);
-    std::cout << "Used arg" << std::endl;
-  }
-  else {
-    std::cout << "Did not use arg" << std::endl;
-  }
+  // if (argc > 1) {
+  //   d = std::atoi(argv[1]);
+  //   std::cout << "Used arg" << std::endl;
+  // }
+  // else {
+  //   std::cout << "Did not use arg" << std::endl;
+  // }
 
   // Choose collocation points
   auto troot = collocation_points(d, "radau");
@@ -180,7 +180,7 @@ int main(int argc, char** argv)
   J = fxqfold(vector<MX>{J, xcs, xs, us}).at(0);
 
   opti.minimize(J);
-  Dict p_opts = {{"expand", false}};
+  Dict p_opts = {{"expand", true}};
   Dict s_opts = {{"max_iter", 200}, {"linear_solver", "ma97"}};
   opti.solver("ipopt", p_opts, s_opts);
   auto sol = opti.solve();

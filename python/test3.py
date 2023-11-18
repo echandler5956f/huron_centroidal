@@ -164,7 +164,7 @@ ubg = np.concatenate(ubg)
 
 # Create an NLP solver
 prob = {'f': J, 'x': w, 'g': g}
-solver = ca.nlpsol('solver', 'ipopt', prob, {"expand": True, "ipopt": {"max_iter": 200, "linear_solver": "ma97"}});
+solver = ca.nlpsol('solver', 'ipopt', prob, {"expand": True, "ipopt": {"max_iter": 200}});
 
 # Function to get x and u trajectories from w
 trajectories = ca.Function('trajectories', [w], [x_plot, u_plot], ['w'], ['x', 'u'])

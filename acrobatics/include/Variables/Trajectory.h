@@ -1,4 +1,5 @@
 #include "Variables/PseudospectralSegment.h"
+#include "Variables/States.h"
 
 namespace acro
 {
@@ -29,6 +30,9 @@ namespace acro
             casadi::Function F;
             casadi::Function L;
             casadi::Function Phi;
+            
+            /*Slicer to get the states*/
+            States state_indices;
 
             /*Fixed time horizon*/
             double T;
