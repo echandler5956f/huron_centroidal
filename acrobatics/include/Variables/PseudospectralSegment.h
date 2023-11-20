@@ -12,49 +12,51 @@ namespace acro
         struct KnotSegment
         {
             /*Actual decision variables*/
-            std::vector<casadi::SX> Xc_var;
+            std::vector<casadi::SX> dXc_var;
             std::vector<casadi::SX> U_var;
-            casadi::SX X0_var;
+            casadi::SX dX0_var;
         };
 
         class LagrangePolynomial
         {
-            public:
-                /*Default constructor*/
-                LagrangePolynomial();
+        public:
+            /*Default constructor*/
+            LagrangePolynomial();
 
-                /*Compute and store the coefficients for a given degree and collocation scheme*/
-                void compute_matrices(int d_, const std::string &scheme = "radau");
+            /*Compute and store the coefficients for a given degree and collocation scheme*/
+            void compute_matrices(int d_, const std::string &scheme = "radau");
 
-                /*Perform symbolic Lagrange Interpolation, which, given a time from the Lagrange time scale, interpolates terms to find the value at time t.*/
-                casadi::SX lagrange_interpolation(double t, std::vector<casadi::SX> terms);
+            /*Perform symbolic Lagrange Interpolation, which, given a time from the Lagrange time scale, interpolates terms to find the value at time t.*/
+            casadi::SX lagrange_interpolation(double t, std::vector<casadi::SX> terms);
 
-                /*Degree of the polynomial*/
-                int d;
-                /*The roots of the polynomial*/
-                Eigen::VectorXd tau_root;
-                /*Quadrature coefficients*/
-                Eigen::VectorXd B;
-                /*Collocation coeffficients*/
-                Eigen::MatrixXd C;
-                /*Continuity coefficients*/
-                Eigen::VectorXd D;
+            /*Degree of the polynomial*/
+            int d;
+            /*The roots of the polynomial*/
+            Eigen::VectorXd tau_root;
+            /*Quadrature coefficients*/
+            Eigen::VectorXd B;
+            /*Collocation coeffficients*/
+            Eigen::MatrixXd C;
+            /*Continuity coefficients*/
+            Eigen::VectorXd D;
         };
 
         class PseudospectralSegment
         {
         public:
-            /*Constructor takes a polynomial degree d, a number of knot segments knot_num_, a period of each knot segment h_, and a pointer to the state index helper state_indices_*/
-            PseudospectralSegment(int d, int knot_num_, double h_, States *state_indices_);
+            /*Constructor takes a polynomial degree d, a number of knot segments knot_num_, a period of each knot segment h_, a pointer to the state index helper state_indices_, integrator function*/
+            PseudospectralSegment(int d, int knot_num_, double h_, States *state_indices_, casadi::Function Fint_);
 
             /*Initialize the relevant expressions*/
             void initialize_expression_variables(int d);
 
+            /*Create all the knot segments*/
+            void initialize_knot_segments();
+
             /*Build the function graph*/
-            void initialize_expression_graph(casadi::Function F_, casadi::Function L_x,  casadi::Function L_u, casadi::Function Fint);
+            void initialize_expression_graph(casadi::Function F_, casadi::Function L_x, casadi::Function L_u);
 
         private:
-
             /*A pseudospectral finite element is made up of knot segments*/
             std::vector<KnotSegment> traj_segment;
 
@@ -73,15 +75,17 @@ namespace acro
             casadi::Function xf_constraint_map;
             casadi::Function q_cost_fold;
 
+            casadi::Function Fint;
+
             /*Variables used to build the expression graphs*/
-            std::vector<casadi::SX> Xc;
+            std::vector<casadi::SX> dXc;
             std::vector<casadi::SX> Uc;
-            casadi::SX X0;
+            casadi::SX dX0;
             casadi::SX Lc;
 
             /*Helper class to store polynomial information*/
             LagrangePolynomial U_poly;
-            LagrangePolynomial X_poly;
+            LagrangePolynomial dX_poly;
 
             /*Helper class for indexing the state variables*/
             States *st_m;
@@ -90,7 +94,6 @@ namespace acro
             int knot_num;
             /*Period of EACH KNOT SEGMENT within this pseudospectral segment*/
             double h;
-
         };
     }
 }
