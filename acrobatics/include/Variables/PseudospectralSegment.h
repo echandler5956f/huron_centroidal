@@ -1,5 +1,7 @@
 #include <pinocchio/autodiff/casadi.hpp>
 #include <vector>
+#include <string>
+#include "Variables/States.h"
 
 #include "Model/LeggedBody.h"
 
@@ -13,20 +15,45 @@ namespace acro
             std::vector<casadi::SX> Xc_var;
             std::vector<casadi::SX> U_var;
             casadi::SX X0_var;
-            casadi::SX Xf_expr;
+        };
+
+        class LagrangePolynomial
+        {
+            public:
+                /*Default constructor*/
+                LagrangePolynomial();
+
+                /*Compute and store the coefficients for a given degree and collocation scheme*/
+                void compute_matrices(int d_, const std::string &scheme = "radau");
+
+                /*Perform symbolic Lagrange Interpolation, which, given a time from the Lagrange time scale, interpolates terms to find the value at time t.*/
+                casadi::SX lagrange_interpolation(double t, std::vector<casadi::SX> terms);
+
+                /*Degree of the polynomial*/
+                int d;
+                /*The roots of the polynomial*/
+                Eigen::VectorXd tau_root;
+                /*Quadrature coefficients*/
+                Eigen::VectorXd B;
+                /*Collocation coeffficients*/
+                Eigen::MatrixXd C;
+                /*Continuity coefficients*/
+                Eigen::VectorXd D;
         };
 
         class PseudospectralSegment
         {
         public:
-            PseudospectralSegment();
-            // PseudospectralSegment(contact::ContactCombination contact_combination);
+            /*Constructor takes a polynomial degree d, a number of knot segments knot_num_, a period of each knot segment h_, and a pointer to the state index helper state_indices_*/
+            PseudospectralSegment(int d, int knot_num_, double h_, States *state_indices_);
 
-            static void compute_collocation_matrices(int d, Eigen::VectorXd &B, Eigen::MatrixXd &C, Eigen::VectorXd &D, const std::string &scheme = "radau");
+            /*Initialize the relevant expressions*/
+            void initialize_expression_variables(int d);
+
+            /*Build the function graph*/
+            void initialize_expression_graph(const casadi::Function F_, const casadi::Function L_x,  const casadi::Function L_u);
 
         private:
-            // void InitConstraints();
-            // void InitMask();
 
             /*A pseudospectral finite element is made up of knot segments*/
             std::vector<KnotSegment> traj_segment;
@@ -48,30 +75,22 @@ namespace acro
 
             /*Variables used to build the expression graphs*/
             std::vector<casadi::SX> Xc;
-            std::vector<casadi::SX> U;
+            std::vector<casadi::SX> Uc;
             casadi::SX X0;
             casadi::SX Lc;
 
-            // struct KnotSegmentConstraints
-            // {
-            //     casadi::Function friction_cone_constraint;
-            //     casadi::Function contact_constraint;
-            //     casadi::Function velocity_constraint;
-            // };
+            /*Helper class to store polynomial information*/
+            LagrangePolynomial U_poly;
+            LagrangePolynomial X_poly;
 
-            // // PseudospectralSegmentConstraint functions are maps of
-            // // KnotSegmentConstraint functions. They are still functions,
-            // // which makes the datatypes the same.
-            // typedef KnotSegmentConstraints PseudospectralSegmentConstraints;
+            /*Helper class for indexing the state variables*/
+            States *st_m;
 
-            // // Constriant on Xcs and Us for one knot segment
-            // KnotSegmentConstraints knot_segment_constraints_;
-            // // Constraints on the entire pseudospectral segment;
-            // //  a map of knot segment constraitns
-            // PseudospectralSegmentConstraints pseudospectral_segment_constraints_;
+            /*Number of knot segments*/
+            int knot_num;
+            /*Period of EACH KNOT SEGMENT within this pseudospectral segment*/
+            double h;
 
-            // contact::ContactCombination contact_combination_;
-            // Eigen::VectorXd contact_mask_;
         };
     }
 }

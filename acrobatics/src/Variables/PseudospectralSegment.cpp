@@ -1,70 +1,125 @@
 #include "Variables/PseudospectralSegment.h"
 
-acro::variables::PseudospectralSegment::PseudospectralSegment()
+void acro::variables::LagrangePolynomial::compute_matrices(int d_, const std::string &scheme)
 {
-}
-
-void acro::variables::PseudospectralSegment::compute_collocation_matrices(int d, Eigen::VectorXd &B, Eigen::MatrixXd &C, Eigen::VectorXd &D, const std::string &scheme)
-{
+    this->d = d_;
     /*Choose collocation points*/
     auto troot = casadi::collocation_points(d, scheme);
     troot.insert(troot.begin(), 0);
-    Eigen::VectorXd tau_root = Eigen::Map<Eigen::VectorXd>(troot.data(), troot.size());
+    this->tau_root = Eigen::Map<Eigen::VectorXd>(troot.data(), troot.size());
 
     /*Coefficients of the quadrature function*/
-    B.resize(d + 1);
+    this->B.resize(d + 1);
 
     /*Coefficients of the collocation equation*/
-    C.resize(d + 1, d + 1);
+    this->C.resize(d + 1, d + 1);
 
     /*Coefficients of the continuity equation*/
-    D.resize(d + 1);
+    this->D.resize(d + 1);
 
     /*For all collocation points*/
     for (int j = 0; j < d + 1; ++j)
     {
-
         /*Construct Lagrange polynomials to get the polynomial basis at the collocation point*/
         casadi::Polynomial p = 1;
-        for (int r = 0; r < d + 1; ++r)
+        for (int r = 0; r < this->d + 1; ++r)
         {
             if (r != j)
             {
-                p *= casadi::Polynomial(-tau_root(r), 1) / (tau_root(j) - tau_root(r));
+                p *= casadi::Polynomial(-this->tau_root(r), 1) / (this->tau_root(j) - this->tau_root(r));
             }
         }
         /*Evaluate the polynomial at the final time to get the coefficients of the continuity equation*/
-        D(j) = p(1.0);
+        this->D(j) = p(1.0);
 
         /*Evaluate the time derivative of the polynomial at all collocation points to get the coefficients of the continuity equation*/
         casadi::Polynomial dp = p.derivative();
         for (int r = 0; r < d + 1; ++r)
         {
-            C(j, r) = dp(tau_root(r));
+            this->C(j, r) = dp(this->tau_root(r));
         }
         auto pint = p.anti_derivative();
-        B(j) = pint(1.0);
+        this->B(j) = pint(1.0);
     }
 }
 
-// acro::variables::PseudospectralSegment::PseudospectralSegment(contact::ContactCombination contact_combination)
-//     : contact_combination_(contact_combination)
-// {
-//     InitMask();
-//     InitConstraints();
-// }
+casadi::SX acro::variables::LagrangePolynomial::lagrange_interpolation(double t, std::vector<casadi::SX> terms)
+{
+    casadi::SX result = 0;
+    for (int j = 0; j < d + 1; ++j)
+    {
+        casadi::SX term = terms[j];
+        for (int r = 0; r < this->d + 1; ++r)
+        {
+            if (r != j)
+            {
+                term *= (t - this->tau_root(r)) / (this->tau_root(j) - this->tau_root(r));
+            }
+        }
+        result += term;
+    }
+    return result;
+}
 
-// void acro::variables::PseudospectralSegment::InitMask()
-// {
-//     int num_end_effectors = contact_combination_.size();
-//     contact_mask_ = Eigen::VectorXd::Zero(num_end_effectors);
-//     // TODO contact_combination_ expects a string key, not an int
-//     for (int i = 0; i < num_end_effectors; i++)
-//     {
-//         contact_mask_[i] = contact_combination_[i].second;
-//     }
-// }
+acro::variables::PseudospectralSegment::PseudospectralSegment(int d, int knot_num_, double h_, States *st_m_)
+{
+    this->knot_num = knot_num_;
+    this->h = h_;
+    this->st_m = st_m_;
+    this->initialize_expression_variables(d);
+}
 
-// void acro::variables::PseudospectralSegment::InitConstraints()
-// {
-// }
+void acro::variables::PseudospectralSegment::initialize_expression_variables(int d)
+{
+    this->Xc.clear();
+    this->Uc.clear();
+
+    this->X_poly.compute_matrices(d);
+    this->U_poly.compute_matrices(d - 1);
+
+    for (int j = 0; j < d; ++j)
+    {
+        this->Xc.push_back(casadi::SX::sym("Xc_" + std::to_string(j), this->st_m->nx, 1));
+        if (j < d - 1)
+        {
+            this->Uc.push_back(casadi::SX::sym("Uc_" + std::to_string(j), this->st_m->nu, 1));
+        }
+    }
+    this->X0 = casadi::SX::sym("X0", this->st_m->nx, 1);
+    this->Lc = casadi::SX::sym("Lc", 1, 1);
+}
+
+void acro::variables::PseudospectralSegment::initialize_expression_graph(const casadi::Function F_, const casadi::Function L_x, const casadi::Function L_u)
+{
+    // State at the end of the collocation interval
+    casadi::SX Xf = this->X_poly.D(0) * this->X0;
+    for (int j = 0; j < this->X_poly.d; ++j)
+    {
+        Xf += this->X_poly.D(j + 1) * this->Xc[j];
+    }
+
+    // Nonlinear equations and cost contribution for collocation interval
+    std::vector<casadi::SX> eq;
+    casadi::SX Qf = 0.0;
+    for (int j = 0; j < this->X_poly.d; ++j)
+    {
+        // Expression for the state derivative at the collocation point
+        casadi::SX xp = this->X_poly.C(0, j + 1) * this->X0;
+        for (int r = 0; r < this->X_poly.d; ++r)
+        {
+            xp += this->X_poly.C(r + 1, j + 1) * this->Xc[r];
+        }
+
+        // Append collocation equations
+        eq.push_back(this->h * F_(std::vector<casadi::SX>{this->Xc[j], this->U_poly.lagrange_interpolation(this->X_poly.tau_root[j], this->Uc)}).at(0) - xp);
+
+        // Add cost contribution
+        Qf += this->X_poly.B(j + 1) * L_x(std::vector<casadi::SX>{Xc[j]}).at(0) * h;
+        Qf += this->U_poly.B(j + 1) * L_u(std::vector<casadi::SX>{this->U_poly.lagrange_interpolation(this->X_poly.tau_root[j], this->Uc)}).at(0) * h;
+    }
+
+    // // Implicit discrete-time dynamics
+    // casadi::Function Feq("feq", {vertcat(Xc), X0, P}, {vertcat(eq)});
+    // casadi::Function Fxf("feq", {vertcat(Xc), X0, P}, {Xf});
+    // casadi::Function Fxq("fxq", {Lc, vertcat(Xc), X0, P}, {Lc + Qf});
+}

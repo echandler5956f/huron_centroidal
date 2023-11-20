@@ -1,5 +1,4 @@
 #include "Variables/PseudospectralSegment.h"
-#include "Variables/States.h"
 
 namespace acro
 {
@@ -11,6 +10,8 @@ namespace acro
             Trajectory();
 
         private:
+            void init_finite_elements();
+
             /*A Trajectory is made up of pseudospectral finite elements*/
             std::vector<PseudospectralSegment> trajectory;
 
@@ -30,7 +31,7 @@ namespace acro
             casadi::Function F;
             casadi::Function L;
             casadi::Function Phi;
-            
+
             /*Slicer to get the states*/
             States state_indices;
 

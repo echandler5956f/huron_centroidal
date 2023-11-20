@@ -10,6 +10,7 @@ namespace acro
             States();
             States(const int nq_, const int nv_);
 
+            static const int nu = 6;
             static const int nh = 6;
             static const int ndh = 12;
             static const int nqb = 7;
@@ -76,7 +77,6 @@ namespace acro
                 return cx(casadi::Slice(this->ndh + this->nq + this->nvb, this->nx));
             }
 
-        protected:
             int nq;
             int nv;
             int nx;
