@@ -4,7 +4,7 @@
 #include <vector>
 namespace acro
 {
-    namespace contact
+    namespace model
     {
         class LeggedBody : public pinocchio::Model
         {

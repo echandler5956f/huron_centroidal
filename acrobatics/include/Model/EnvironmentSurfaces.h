@@ -19,6 +19,35 @@ namespace acro
             Eigen::Vector2d polytope_local_chebyshev_center;
         };
 
+        template <class T>
+        void PointViolation(const SurfaceData &region, const Eigen::Vector2<T> &point, Eigen::VectorX<T> &ineq_violation)
+        {
+            ineq_violation = region.A * point - region.b;
+        }
+        template <class T>
+        void PointViolation(const SurfaceData &region, const Eigen::Vector3<T> &point, Eigen::VectorX<T> &ineq_violation, Eigen::VectorX<T> &eq_violation)
+        {
+            ineq_violation = region.A * point.head(2) - region.b;
+            eq_violation = point.tail(1) - region.origin_z_offset;
+        }
+
+        bool isInRegion(const SurfaceData &region, const Eigen::Vector2d &point)
+        {
+            Eigen::VectorXd violation;
+            PointViolation(region, point, violation);
+            return (violation.array() <= Eigen::VectorXd::Zeros(violation.size()).array()).all()
+        }
+
+        bool isOnRegion(const SurfaceData &region, const Eigen::Vector3d &point)
+        {
+            Eigen::VectorXd ineq_violation;
+            Eigen::Vector1d eq_violation;
+            PointViolation(region, point, violation, eq_violation);
+            bool ineq_satisfied = (ineq_violation.array() <= Eigen::VectorXd::Zeros(ineq_violation.size()).array()).all();
+            bool eq_satisfied = (eq_violation[0] <= 1e-6) && (eq_violation[0] >= -1e-6);
+            return ineq_satisfied && eq_satisfied;
+        }
+
         // The chebyshev center of A and b in 3d. WILL NOT WORK IF THE LOCAL CENTER HAS NOT BEEN COMPUTED.
         Eigen::Vector3d getChebyshevCenter(const SurfaceData &surface_data)
         {
@@ -49,12 +78,41 @@ namespace acro
             // this is a linear program.
         }
 
-        class EnvironmentSurfaces
+        class EnvironmentSurfaces : public std::vector<SurfaceData>
         {
-            // EMPTY FOR NOW; DISCUSS WITH YIFU & LEHONG
+            EnvironmentSurfaces() : std::vector<SurfaceData> {}
+
+            std::vector<int> getSurfacesUnder(const Eigen::Vector2d &ee_pos)
+            {
+                std::vector<int> surface_indeces;
+                for (int i = 0; i < this->size(); i++)
+                {
+                    bool is_in_region = isInRegion((*this)[i], ee_pos);
+                    if (is_in_region)
+                    {
+                        surface_indeces.push_back(i);
+                    }
+                }
+                return surface_indeces;
+            }
+
+            std::vector<SurfaceData> getSurfacesFromIndeces(const std::vector<int> indeces)
+            {
+
+                std::vector<SurfaceData> surfaces;
+                for (int i = 0; i < indeces.size(); i++)
+                {
+                    surfaces.push_back((*this)[indeces[i]]);
+                }
+                return surfaces;
+            }
+
+            // Generate the straight shot trajectory of each limb from the starting to the target
+            // and sample to find surfaces underneath
+
             // Get k-closest regions to current; convex program.
-            // need a way to define surface and surface identifiers
-            std::vector<SurfaceIdentifiers> LeggedBody::getKClosestRegions(Eigen::Vector3d ee_pos, int k);
+            std::vector<int>
+            LeggedBody::getKClosestRegions(Eigen::Vector3d ee_pos, int k);
         };
     }
 }
