@@ -51,7 +51,7 @@ namespace acro
             void initialize_expression_variables(int d);
 
             /*Build the function graph*/
-            void initialize_expression_graph(const casadi::Function F_, const casadi::Function L_x,  const casadi::Function L_u);
+            void initialize_expression_graph(casadi::Function F_, casadi::Function L_x,  casadi::Function L_u, casadi::Function Fint);
 
         private:
 

@@ -123,7 +123,7 @@ class PseudoSpectralCollocation:
         s.degree = degree
 
         # Get collocation points
-        tau_root = np.append(0, ca.collocation_points(s.degree, "radau"))
+        s.tau_root = np.append(0, ca.collocation_points(s.degree, "radau"))
 
         # Coefficients of the collocation equation
         s.C = np.zeros((s.degree + 1, s.degree + 1))
@@ -140,7 +140,7 @@ class PseudoSpectralCollocation:
             p = np.poly1d([1])
             for r in range(s.degree + 1):
                 if r != j:
-                    p *= np.poly1d([1, -tau_root[r]]) / (tau_root[j] - tau_root[r])
+                    p *= np.poly1d([1, -s.tau_root[r]]) / (s.tau_root[j] - s.tau_root[r])
 
             # Evaluate the polynomial at the final time to get the coefficients of the continuity equation
             s.D[j] = p(1.0)
@@ -149,7 +149,7 @@ class PseudoSpectralCollocation:
             # continuity equation
             p_der = np.polyder(p)
             for r in range(s.degree + 1):
-                s.C[j, r] = p_der(tau_root[r])
+                s.C[j, r] = p_der(s.tau_root[r])
 
             # Evaluate the integral of the polynomial to get the coefficients of the quadrature function
             pint = np.polyint(p)
@@ -567,13 +567,14 @@ class CentroidalTrajOpt:
             # Loop over collocation points
             dx_k_end = s.col.D[0] * dx_k
             for j in range(1, s.col.degree + 1):
+                dt_j = (s.col.tau_root[j] - s.col.tau_root[j - 1]) * dt
                 # Expression for the state derivative at the collocation point
                 dx_p = s.col.C[0, j] * dx_k
                 for r in range(s.col.degree):
                     dx_p += s.col.C[r + 1, j] * dx_c[r]
 
                 # Append collocation equations
-                x_c = s.cintegrate(x_k, dx_c[j - 1], dt)
+                x_c = s.cintegrate(x_k, dx_c[j - 1], dt_j)
                 fj = s.xdot(x_c, u_k, vj_k)
                 qj = s.L(x_c, u_k, vj_k)
 

@@ -79,43 +79,47 @@ void acro::variables::PseudospectralSegment::initialize_expression_variables(int
 
     for (int j = 0; j < d; ++j)
     {
-        this->Xc.push_back(casadi::SX::sym("Xc_" + std::to_string(j), this->st_m->nx, 1));
+        this->Xc.push_back(casadi::SX::sym("Xc_" + std::to_string(j), this->st_m->ndx, 1));
         if (j < d - 1)
         {
             this->Uc.push_back(casadi::SX::sym("Uc_" + std::to_string(j), this->st_m->nu, 1));
         }
     }
-    this->X0 = casadi::SX::sym("X0", this->st_m->nx, 1);
+    this->X0 = casadi::SX::sym("X0", this->st_m->ndx, 1);
     this->Lc = casadi::SX::sym("Lc", 1, 1);
 }
 
-void acro::variables::PseudospectralSegment::initialize_expression_graph(const casadi::Function F_, const casadi::Function L_x, const casadi::Function L_u)
+void acro::variables::PseudospectralSegment::initialize_expression_graph(casadi::Function F_, casadi::Function L_x, casadi::Function L_u, casadi::Function Fint)
 {
+
+    // Collocation equations
+    std::vector<casadi::SX> eq;
     // State at the end of the collocation interval
     casadi::SX Xf = this->X_poly.D(0) * this->X0;
-    for (int j = 0; j < this->X_poly.d; ++j)
-    {
-        Xf += this->X_poly.D(j + 1) * this->Xc[j];
-    }
+    // Cost at the end of the collocation interval
+    casadi::SX Qf = 0;
 
-    // Nonlinear equations and cost contribution for collocation interval
-    std::vector<casadi::SX> eq;
-    casadi::SX Qf = 0.0;
-    for (int j = 0; j < this->X_poly.d; ++j)
+    for (int j = 1; j < this->X_poly.d + 1; ++j)
     {
+        double dt_j = this->X_poly.tau_root(j) - this->X_poly.tau_root(j - 1) * h;
         // Expression for the state derivative at the collocation point
-        casadi::SX xp = this->X_poly.C(0, j + 1) * this->X0;
+        casadi::SX xp = this->X_poly.C(0, j) * this->X0;
         for (int r = 0; r < this->X_poly.d; ++r)
         {
-            xp += this->X_poly.C(r + 1, j + 1) * this->Xc[r];
+            xp += this->X_poly.C(r + 1, j) * this->Xc[r];
         }
 
+        casadi::SX x_c = Fint(std::vector<casadi::SX>{this->X0, this->Xc[j - 1], dt_j}).at(0);
+        casadi::SX u_c = this->U_poly.lagrange_interpolation(this->X_poly.tau_root(j - 1), this->Uc);
+
         // Append collocation equations
-        eq.push_back(this->h * F_(std::vector<casadi::SX>{this->Xc[j], this->U_poly.lagrange_interpolation(this->X_poly.tau_root[j], this->Uc)}).at(0) - xp);
+        eq.push_back(this->h * F_(std::vector<casadi::SX>{x_c, u_c}).at(0) - xp);
 
         // Add cost contribution
-        Qf += this->X_poly.B(j + 1) * L_x(std::vector<casadi::SX>{Xc[j]}).at(0) * h;
-        Qf += this->U_poly.B(j + 1) * L_u(std::vector<casadi::SX>{this->U_poly.lagrange_interpolation(this->X_poly.tau_root[j], this->Uc)}).at(0) * h;
+        Qf += this->X_poly.B(j) * L_x(std::vector<casadi::SX>{Xc[j]}).at(0) * h;
+        Qf += this->U_poly.B(j) * L_u(std::vector<casadi::SX>{u_c}).at(0) * h;
+
+        Xf += this->X_poly.D(j) * this->Xc[j - 1];
     }
 
     // // Implicit discrete-time dynamics

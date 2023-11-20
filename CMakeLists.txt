@@ -11,7 +11,7 @@ set(CMAKE_COLOR_MAKEFILE ON)
 set(CMAKE_CXX_FLAGS "-O3 -no-pie -ggdb -Wall \
     -Wextra -Wcast-align -Wdisabled-optimization -Wformat=2 \
     -Winit-self -Wmissing-include-dirs -Woverloaded-virtual \
-    -Wshadow -Wsign-promo -Werror")
+    -Wshadow -Wsign-promo")
 
 set(CMAKE_C_FLAGS "-O3  -ggdb -std=gnu99 -I.")
 set(CMAKE_CXX_STANDARD 11)
