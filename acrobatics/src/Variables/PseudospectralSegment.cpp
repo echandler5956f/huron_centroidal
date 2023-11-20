@@ -61,65 +61,86 @@ casadi::SX acro::variables::LagrangePolynomial::lagrange_interpolation(double t,
     return result;
 }
 
-acro::variables::PseudospectralSegment::PseudospectralSegment(int d, int knot_num_, double h_, States *st_m_)
+acro::variables::PseudospectralSegment::PseudospectralSegment(int d, int knot_num_, double h_, States *st_m_, casadi::Function Fint_)
 {
     this->knot_num = knot_num_;
+    this->Fint = Fint_;
     this->h = h_;
     this->st_m = st_m_;
     this->initialize_expression_variables(d);
+    this->initialize_knot_segments();
 }
 
 void acro::variables::PseudospectralSegment::initialize_expression_variables(int d)
 {
-    this->Xc.clear();
+    this->dXc.clear();
     this->Uc.clear();
 
-    this->X_poly.compute_matrices(d);
+    this->dX_poly.compute_matrices(d);
     this->U_poly.compute_matrices(d - 1);
 
     for (int j = 0; j < d; ++j)
     {
-        this->Xc.push_back(casadi::SX::sym("Xc_" + std::to_string(j), this->st_m->ndx, 1));
+        this->dXc.push_back(casadi::SX::sym("Xc_" + std::to_string(j), this->st_m->ndx, 1));
         if (j < d - 1)
         {
             this->Uc.push_back(casadi::SX::sym("Uc_" + std::to_string(j), this->st_m->nu, 1));
         }
     }
-    this->X0 = casadi::SX::sym("X0", this->st_m->ndx, 1);
+    this->dX0 = casadi::SX::sym("X0", this->st_m->ndx, 1);
     this->Lc = casadi::SX::sym("Lc", 1, 1);
 }
 
-void acro::variables::PseudospectralSegment::initialize_expression_graph(casadi::Function F_, casadi::Function L_x, casadi::Function L_u, casadi::Function Fint)
+void acro::variables::PseudospectralSegment::initialize_knot_segments()
+{
+    traj_segment.clear();
+    for (int k = 0; k < this->knot_num; ++k)
+    {
+        KnotSegment knot_segment_k;
+        for (int j = 0; j < this->dX_poly.d; ++j)
+        {
+            knot_segment_k.dXc_var.push_back(casadi::SX::sym("dXc_" + std::to_string(k) + "_" + std::to_string(j), this->st_m->ndx, 1));
+        }
+        for (int j = 0; j < this->U_poly.d; ++j)
+        {
+            knot_segment_k.U_var.push_back(casadi::SX::sym("U_" + std::to_string(k) + "_" + std::to_string(j), this->st_m->nu, 1));
+        }
+        knot_segment_k.dX0_var = casadi::SX::sym("dX0_" + std::to_string(k), this->st_m->ndx, 1);
+        traj_segment.push_back(knot_segment_k);
+    }
+}
+
+void acro::variables::PseudospectralSegment::initialize_expression_graph(casadi::Function F_, casadi::Function L_dx, casadi::Function L_u)
 {
 
     // Collocation equations
     std::vector<casadi::SX> eq;
     // State at the end of the collocation interval
-    casadi::SX Xf = this->X_poly.D(0) * this->X0;
+    casadi::SX dXf = this->dX_poly.D(0) * this->dX0;
     // Cost at the end of the collocation interval
     casadi::SX Qf = 0;
 
-    for (int j = 1; j < this->X_poly.d + 1; ++j)
+    for (int j = 1; j < this->dX_poly.d + 1; ++j)
     {
-        double dt_j = this->X_poly.tau_root(j) - this->X_poly.tau_root(j - 1) * h;
+        double dt_j = this->dX_poly.tau_root(j) - this->dX_poly.tau_root(j - 1) * h;
         // Expression for the state derivative at the collocation point
-        casadi::SX xp = this->X_poly.C(0, j) * this->X0;
-        for (int r = 0; r < this->X_poly.d; ++r)
+        casadi::SX dxp = this->dX_poly.C(0, j) * this->dX0;
+        for (int r = 0; r < this->dX_poly.d; ++r)
         {
-            xp += this->X_poly.C(r + 1, j) * this->Xc[r];
+            dxp += this->dX_poly.C(r + 1, j) * this->dXc[r];
         }
 
-        casadi::SX x_c = Fint(std::vector<casadi::SX>{this->X0, this->Xc[j - 1], dt_j}).at(0);
-        casadi::SX u_c = this->U_poly.lagrange_interpolation(this->X_poly.tau_root(j - 1), this->Uc);
+        casadi::SX x_c = this->Fint(std::vector<casadi::SX>{this->dX0, this->dXc[j - 1], dt_j}).at(0);
+        casadi::SX u_c = this->U_poly.lagrange_interpolation(this->dX_poly.tau_root(j - 1), this->Uc);
 
         // Append collocation equations
-        eq.push_back(this->h * F_(std::vector<casadi::SX>{x_c, u_c}).at(0) - xp);
+        eq.push_back(this->h * F_(std::vector<casadi::SX>{x_c, u_c}).at(0) - dxp);
 
         // Add cost contribution
-        Qf += this->X_poly.B(j) * L_x(std::vector<casadi::SX>{Xc[j]}).at(0) * h;
+        Qf += this->dX_poly.B(j) * L_dx(std::vector<casadi::SX>{dXc[j]}).at(0) * h;
         Qf += this->U_poly.B(j) * L_u(std::vector<casadi::SX>{u_c}).at(0) * h;
 
-        Xf += this->X_poly.D(j) * this->Xc[j - 1];
+        dXf += this->dX_poly.D(j) * this->dXc[j - 1];
     }
 
     // // Implicit discrete-time dynamics
