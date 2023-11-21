@@ -25,9 +25,9 @@ namespace acro
             // returns the chebychev center in the global frame.
             // (Adds a height component if the surface is gravity aligned and in the global frame)
 
-            Eigen::Vector3d c_center;
-            c_center.head(2) = surface_data.polytope_local_chebyshev_center;
-            c_center.tail(1) = surface_data.origin_z_offset;
+            // Eigen::Vector3d c_center;
+            // c_center.head(2) = surface_data.polytope_local_chebyshev_center;
+            // c_center.tail(1) = surface_data.origin_z_offset;
         }
 
         Eigen::VectorXd CalculateChebyshevCenter(const Eigen::MatrixXd &A, const Eigen::VectorXd &b)
@@ -54,7 +54,7 @@ namespace acro
             // EMPTY FOR NOW; DISCUSS WITH YIFU & LEHONG
             // Get k-closest regions to current; convex program.
             // need a way to define surface and surface identifiers
-            std::vector<SurfaceIdentifiers> LeggedBody::getKClosestRegions(Eigen::Vector3d ee_pos, int k);
+            // std::vector<SurfaceIdentifiers> LeggedBody::getKClosestRegions(Eigen::Vector3d ee_pos, int k);
         };
     }
 }

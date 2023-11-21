@@ -1,4 +1,4 @@
-#!.venv/bin/python3
+#!/home/quant/ros_ws/src/huron_centroidal/.venv/bin/python3
 
 from gazebo_msgs.srv import SetModelConfiguration, SetModelConfigurationRequest, SetModelState, SetModelStateRequest
 from gazebo_msgs.msg import ModelState
@@ -20,7 +20,7 @@ def main():
     unpause_physics_client = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
     pause_physics_client = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
     
-    model_name_ = "huron"
+    model_name_ = "huron_description"
     urdf_param_name_ = "$(find xacro)/xacro --inorder '$(find huron_description)/urdf/huron.xacro'"
     joint_names_ = ["l_hip_yaw_joint", "l_hip_roll_joint", "l_hip_pitch_joint", "l_knee_pitch_joint", "l_ankle_pitch_joint", "l_ankle_roll_joint",
                     "r_hip_yaw_joint", "r_hip_roll_joint", "r_hip_pitch_joint", "r_knee_pitch_joint", "r_ankle_pitch_joint", "r_ankle_roll_joint"]
