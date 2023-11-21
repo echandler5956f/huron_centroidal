@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Model/EndEffector.h"
 
 #include <pinocchio/multibody/model.hpp>

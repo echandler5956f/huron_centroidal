@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Variables/PseudospectralSegment.h"
 
 namespace acro

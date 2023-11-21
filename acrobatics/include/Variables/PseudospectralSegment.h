@@ -1,3 +1,5 @@
+#pragma once
+
 #include <pinocchio/autodiff/casadi.hpp>
 #include <vector>
 #include <string>

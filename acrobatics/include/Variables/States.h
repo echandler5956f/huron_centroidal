@@ -1,3 +1,5 @@
+#pragma once
+
 #include <pinocchio/autodiff/casadi.hpp>
 
 namespace acro
