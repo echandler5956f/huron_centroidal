@@ -18,16 +18,31 @@ namespace variables
     };
 
     template <class Sym>
-    struct ProblemSetup
+    struct InitialCondition
     {
 
-        ProblemSetup(Sym set_x0_vars,
-                     States set_state_def,
-                     contact::ContactCombination set_init_mode) : x0_vars(set_x0_vars),
-                                                                  state_def(set_state_def), init_mode(set_init_mode) {}
+        InitialCondition(Sym set_x0_vars,
+                         States set_state_def,
+                         contact::ContactMode set_init_mode) : x0_vars(set_x0_vars),
+                                                               state_def(set_state_def), init_mode(set_init_mode) {}
 
         Sym x0_vars;
         States state_def;
-        contact::ContactCombination init_mode
+        contact::ContactMode init_mode
+    };
+
+    template <class Sym>
+    struct ProblemSetup
+    {
+        //
+        ProblemSetup(InitialCondition set_init_condition,
+                     contact::ContactSequence set_contact_sequence) : init_condition(set_init_condition),
+                                                                      contact_sequence(set_contact_sequence) {}
+        //
+
+        bool CheckValidity();
+
+        InitialCondition init_condition;
+        contact::ContactSequence contact_sequence;
     };
 }
