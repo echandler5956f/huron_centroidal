@@ -34,20 +34,28 @@ namespace acro
 
         Eigen::VectorXd CalculateChebyshevCenter(const Eigen::MatrixXd &A, const Eigen::VectorXd &b);
 
+        using SurfaceID = int;
+
+        using NO_SURFACE = -1;
+
         class EnvironmentSurfaces : public std::vector<SurfaceData>
         {
+        public:
             EnvironmentSurfaces() : std::vector<SurfaceData> {}
 
-            std::vector<int> getSurfacesUnder(const Eigen::Vector2d &ee_pos);
+            std::vector<SurfaceID> getSurfacesUnder(const Eigen::Vector2d &ee_pos);
 
-            std::vector<SurfaceData> getSurfacesFromIndeces(const std::vector<int> indeces);
+            std::vector<SurfaceData> getSurfacesFromIDs(const std::vector<SurfaceID> IDs);
 
             // Generate the straight shot trajectory of each limb from the starting to the target
             // and sample to find surfaces underneath
 
             // Get k-closest regions to current; convex program.
-            std::vector<int>
+            std::vector<SurfaceID>
             getKClosestRegions(Eigen::Vector3d ee_pos, int k);
+
+            uint NumSurfaces() { return (*this).size(); }
         };
+
     }
 }

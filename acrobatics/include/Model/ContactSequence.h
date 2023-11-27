@@ -1,9 +1,28 @@
 #include "Model/EndEffector.h"
+#include "Model/EnvironmentSurfaces.h"
 
 namespace acro
 {
     namespace contact
     {
+
+        struct ContactMode
+        {
+            enum ContactModeValidity
+            {
+                VALID,
+                SURFACE_NOT_DEFINED,
+                DIFFERING_SIZES
+            };
+            // Gets which EEs are in contact
+            ContactCombination combination_definition;
+
+            // Gets which surfaces the EEs are in contact with
+            std::vector<environment::SurfaceID> contact_surfaces;
+
+            // Makes the combination valid. If an EE is not in contact, it makes the corresponding contact surface NO_SURFACE
+            void MakeValid(ContactModeValidity &validity);
+        };
 
         class ContactSequence
         {
@@ -19,12 +38,12 @@ namespace acro
             // Does the phase timing change? if so, then the _t0_offset and dt_ need to change.
             struct Phase
             {
-                ContactCombination contacts;
+                ContactMode mode;
                 int knot_points = 1;
                 double time_value = 1;
             };
 
-            int addPhase(const ContactCombination &contacts, int knot_points, double dt);
+            int addPhase(const ContactMode &mode, int knot_points, double dt);
 
             int getPhaseIndexAtTime(double t, CONTACT_SEQUENCE_ERROR &error_status);
 
@@ -44,7 +63,6 @@ namespace acro
             double dt_ = 0;
             int total_knots_ = 0;
             int num_end_effectors_;
-            int num_end_effectors;
         };
     }
 }

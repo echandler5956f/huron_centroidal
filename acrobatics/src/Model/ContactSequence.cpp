@@ -5,13 +5,42 @@ namespace acro
     namespace contact
     {
 
+        // Makes the combination valid. If an EE is not in contact, it makes the corresponding contact surface NO_SURFACE
+        void ContactMode::MakeValid(ContactModeValidity &validity)
+        {
+            if (combination_definition.size() != contact_surfaces.size())
+            {
+                validity = ContactModeValidity::DIFFERING_SIZES;
+                return;
+            }
+
+            for (int i = 0; i < combination_definition.size(); i++)
+            {
+                bool is_in_contact = combination_definition[i].second;
+                if (!is_in_contact)
+                {
+                    // If it is not in contact, make the contact surface NO_SURFACE
+                    contact_surfaces[i] = environment::NO_SURFACE;
+                }
+
+                bool surface_is_not_defined = (contact_surfaces[i] == environment::NO_SURFACE);
+
+                if (is_in_contact && surface_is_not_defined)
+                {
+                    validity = ContactModeValidity::SURFACE_NOT_DEFINED;
+                    return;
+                }
+            }
+        }
+
         const ContactSequence::Phase &ContactSequence::getPhase(int index) { return phase_sequence_[index]; }
 
-        int ContactSequence::addPhase(const ContactCombination &contacts, int knot_points, double dt)
+        int ContactSequence::addPhase(const ContactMode &mode, int knot_points, double dt)
         {
             // assert that contacts.size() == num_end_effectors_
             Phase new_phase;
-            new_phase.contacts = contacts;
+            new_phase.mode = mode;
+            new_phase.mode.MakeValid();
             new_phase.knot_points = knot_points;
             new_phase.time_value = dt;
 
