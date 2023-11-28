@@ -186,3 +186,24 @@ plt.xlabel('t')
 plt.legend(['x1','x2','u'])
 plt.grid()
 plt.show()
+
+
+# import casadi as cs
+
+# def linearize_new(f, x, x0, u, u0):
+#     x_lim = cs.SX.sym('x_lim', x.sparsity())
+#     u_lim = cs.SX.sym('u_lim', u.sparsity())
+#     flx = cs.substitute(f + cs.jtimes(f, x, x_lim - x0), cs.vertcat(x_lim, x), cs.vertcat(x, x0))
+#     flu = cs.substitute(flx + cs.jtimes(flx, u, u_lim - u0), cs.vertcat(u_lim, u), cs.vertcat(u, u0))
+#     return flu
+
+# x = cs.SX.sym('x', 1)
+# x0 = cs.SX.sym('x0', 1)
+# u = cs.SX.sym('u', 1)
+# u0 = cs.SX.sym('u0', 1)
+# rhs = x*x + cs.sin(u) # Nonlinear equation
+
+# f_linear_new = cs.Function('f_linear_new', [x, x0, u, u0], [linearize_new(rhs, x, x0, u, u0)])
+
+# linearize_new(rhs, x, x0, u, u0)
+# print(f_linear_new(cs.vertcat(2.15), cs.vertcat(2.0), cs.vertcat(3.0), cs.vertcat(cs.pi)))

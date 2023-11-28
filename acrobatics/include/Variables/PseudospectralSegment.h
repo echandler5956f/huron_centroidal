@@ -1,10 +1,10 @@
 #pragma once
 
-#include <pinocchio/autodiff/casadi.hpp>
 #include <vector>
 #include <string>
-#include "Variables/States.h"
-
+#include "Variables/Constraint.h"
+#include "Variables/Objective.h"
+#include <cassert>
 #include "Model/LeggedBody.h"
 
 namespace acro

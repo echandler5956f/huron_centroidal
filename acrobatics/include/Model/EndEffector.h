@@ -26,6 +26,6 @@ namespace acro
         // We use a ptr so that there is only ever one instance of the end effector.
         typedef std::map<std::string, std::shared_ptr<EndEffector>> RobotEndEffectors;
 
-        typedef std::map<std::string, acro::environment::SurfaceData *> ContactCombination;
+        typedef std::map<std::string, bool> ContactCombination;
     }
 }
