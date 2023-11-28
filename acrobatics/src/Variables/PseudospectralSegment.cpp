@@ -99,7 +99,7 @@ namespace acro
 
         void PseudospectralSegment::initialize_knot_segments()
         {
-            traj_segment.clear();
+            this->traj_segment.clear();
             for (int k = 0; k < this->knot_num; ++k)
             {
                 KnotSegment knot_segment_k;
@@ -112,7 +112,7 @@ namespace acro
                     knot_segment_k.U_var.push_back(casadi::SX::sym("U_" + std::to_string(k) + "_" + std::to_string(j), this->st_m->nu, 1));
                 }
                 knot_segment_k.dX0_var = casadi::SX::sym("dX0_" + std::to_string(k), this->st_m->ndx, 1);
-                traj_segment.push_back(knot_segment_k);
+                this->traj_segment.push_back(knot_segment_k);
             }
         }
 
@@ -128,7 +128,7 @@ namespace acro
 
             for (int j = 1; j < this->dX_poly.d + 1; ++j)
             {
-                double dt_j = this->dX_poly.tau_root(j) - this->dX_poly.tau_root(j - 1) * h;
+                double dt_j = this->dX_poly.tau_root(j) - this->dX_poly.tau_root(j - 1) * this->h;
                 // Expression for the state derivative at the collocation point
                 casadi::SX dxp = this->dX_poly.C(0, j) * this->dX0;
                 for (int r = 0; r < this->dX_poly.d; ++r)
@@ -143,16 +143,15 @@ namespace acro
                 eq.push_back(this->h * F_(std::vector<casadi::SX>{x_c, u_c}).at(0) - dxp);
 
                 // Add cost contribution
-                Qf += this->dX_poly.B(j) * L_dx(std::vector<casadi::SX>{dXc[j]}).at(0) * h;
-                Qf += this->U_poly.B(j) * L_u(std::vector<casadi::SX>{u_c}).at(0) * h;
+                Qf += this->dX_poly.B(j) * L_dx(std::vector<casadi::SX>{this->dXc[j]}).at(0) * this->h;
+                Qf += this->U_poly.B(j) * L_u(std::vector<casadi::SX>{u_c}).at(0) * this->h;
 
                 dXf += this->dX_poly.D(j) * this->dXc[j - 1];
             }
-
-            // // Implicit discrete-time dynamics
-            // casadi::Function Feq("feq", {vertcat(Xc), X0, P}, {vertcat(eq)});
-            // casadi::Function Fxf("feq", {vertcat(Xc), X0, P}, {Xf});
-            // casadi::Function Fxq("fxq", {Lc, vertcat(Xc), X0, P}, {Lc + Qf});
+            // Implicit discrete-time dynamics
+            casadi::Function Feq("feq", std::vector<casadi::SX>{vertcat(this->dXc), this->dX0, vertcat(this->Uc)}, std::vector<casadi::SX>{vertcat(eq)});
+            casadi::Function Fxf("fxf", std::vector<casadi::SX>{vertcat(this->dXc), this->dX0, vertcat(this->Uc)}, std::vector<casadi::SX>{dXf});
+            casadi::Function Fxq("fxq", std::vector<casadi::SX>{this->Lc, vertcat(this->dXc), this->dX0, vertcat(this->Uc)}, std::vector<casadi::SX>{this->Lc + Qf});
         }
     }
 }
