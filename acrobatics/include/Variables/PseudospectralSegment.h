@@ -69,9 +69,11 @@ namespace acro
                 dynamics.
 
                 xf_constraint_map: The map which matches the approximated final state expression with the initial
-                state of the next segment
+                state of the next segment.
 
                 q_cost_fold: The accumulated cost across all the knot segments found using quadrature rules.
+
+                general_constraint_maps: User defined constraints, which are functions with certain bounds associated with them.
             */
             casadi::Function collocation_constraint_map;
             casadi::Function xf_constraint_map;
