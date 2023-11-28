@@ -2,10 +2,8 @@
 
 #include <vector>
 #include <string>
-#include "Variables/Constraint.h"
-#include "Variables/Objective.h"
 #include <cassert>
-#include "Model/LeggedBody.h"
+#include "Variables/States.h"
 
 namespace acro
 {

@@ -41,7 +41,7 @@ namespace acro
             int num_phases();
 
             // we will fill this out as needed.
-        private:
+        // private:
             std::vector<Phase> phase_sequence_;
             std::vector<double> phase_t0_offset_;
             std::vector<int> phase_knot0_idx_;

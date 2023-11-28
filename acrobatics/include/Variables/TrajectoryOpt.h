@@ -1,18 +1,19 @@
 #pragma once
 
+#include "Model/ContactSequence.h"
 #include "Variables/PseudospectralSegment.h"
 
 namespace acro
 {
     namespace variables
     {
-        class Trajectory
+        class TrajectoryOpt
         {
         public:
-            Trajectory();
+            TrajectoryOpt();
 
         private:
-            void init_finite_elements();
+            void init_finite_elements(contact::ContactSequence contacts, int d);
 
             /*A Trajectory is made up of pseudospectral finite elements*/
             std::vector<PseudospectralSegment> trajectory;

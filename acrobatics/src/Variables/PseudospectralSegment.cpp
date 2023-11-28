@@ -164,11 +164,13 @@ namespace acro
                                                  std::vector<casadi::SX>{this->Lc + Qf})
                                     .fold(this->knot_num);
             /*Map the constraint to each collocation point, and then map the mapped constraint to each knot segment*/
+            auto tmp_dx = this->dXc;
+            tmp_dx.push_back(this->dX0); /*If we are doing this for state, is the size right for U?*/
             for (auto g : G)
             {
-                auto tmp_map = g.map(this->dX_poly.d, "serial")(std::vector<casadi::SX>{vertcat(this->dXc), vertcat(this->Uc)});
+                auto tmp_map = g.map(this->dX_poly.d, "serial")(std::vector<casadi::SX>{vertcat(tmp_dx), vertcat(this->Uc)});
                 this->general_constraint_maps.push_back(casadi::Function("fg",
-                                                                         std::vector<casadi::SX>{vertcat(this->dXc), vertcat(this->Uc)},
+                                                                         std::vector<casadi::SX>{vertcat(tmp_dx), vertcat(this->Uc)},
                                                                          std::vector<casadi::SX>{vertcat(tmp_map)})
                                                             .map(this->knot_num, "openmp"));
             }
