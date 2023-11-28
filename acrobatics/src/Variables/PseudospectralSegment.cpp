@@ -116,7 +116,7 @@ namespace acro
             }
         }
 
-        void PseudospectralSegment::initialize_expression_graph(casadi::Function F, casadi::Function L)
+        void PseudospectralSegment::initialize_expression_graph(casadi::Function F, casadi::Function L, std::vector<casadi::Function> G)
         {
 
             /*Collocation equations*/
@@ -151,9 +151,27 @@ namespace acro
                 dXf += this->dX_poly.D(j) * this->dXc[j - 1];
             }
             /*Implicit discrete-time equations*/
-            casadi::Function Feq("feq", std::vector<casadi::SX>{vertcat(this->dXc), this->dX0, vertcat(this->Uc)}, std::vector<casadi::SX>{vertcat(eq)});
-            casadi::Function Fxf("fxf", std::vector<casadi::SX>{vertcat(this->dXc), this->dX0, vertcat(this->Uc)}, std::vector<casadi::SX>{dXf});
-            casadi::Function Fxq("fxq", std::vector<casadi::SX>{this->Lc, vertcat(this->dXc), this->dX0, vertcat(this->Uc)}, std::vector<casadi::SX>{this->Lc + Qf});
+            this->collocation_constraint_map = casadi::Function("feq",
+                                                                std::vector<casadi::SX>{vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
+                                                                std::vector<casadi::SX>{vertcat(eq)})
+                                                   .map(this->knot_num, "openmp");
+            this->xf_constraint_map = casadi::Function("fxf",
+                                                       std::vector<casadi::SX>{vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
+                                                       std::vector<casadi::SX>{dXf})
+                                          .map(this->knot_num, "openmp");
+            this->q_cost_fold = casadi::Function("fxq",
+                                                 std::vector<casadi::SX>{this->Lc, vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
+                                                 std::vector<casadi::SX>{this->Lc + Qf})
+                                    .fold(this->knot_num);
+            /*Map the constraint to each collocation point, and then map the mapped constraint to each knot segment*/
+            for (auto g : G)
+            {
+                auto tmp_map = g.map(this->dX_poly.d, "serial")(std::vector<casadi::SX>{vertcat(this->dXc), vertcat(this->Uc)});
+                this->general_constraint_maps.push_back(casadi::Function("fg",
+                                                                         std::vector<casadi::SX>{vertcat(this->dXc), vertcat(this->Uc)},
+                                                                         std::vector<casadi::SX>{vertcat(tmp_map)})
+                                                            .map(this->knot_num, "openmp"));
+            }
         }
     }
 }
