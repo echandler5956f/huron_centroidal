@@ -56,7 +56,7 @@ namespace acro
             void initialize_knot_segments();
 
             /*Build the function graph*/
-            void initialize_expression_graph(casadi::Function F_, casadi::Function L_x, casadi::Function L_u);
+            void initialize_expression_graph(casadi::Function F, casadi::Function L);
 
         private:
             /*A pseudospectral finite element is made up of knot segments*/

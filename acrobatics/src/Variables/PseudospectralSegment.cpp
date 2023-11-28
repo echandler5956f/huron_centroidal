@@ -116,20 +116,20 @@ namespace acro
             }
         }
 
-        void PseudospectralSegment::initialize_expression_graph(casadi::Function F_, casadi::Function L_dx, casadi::Function L_u)
+        void PseudospectralSegment::initialize_expression_graph(casadi::Function F, casadi::Function L)
         {
 
-            // Collocation equations
+            /*Collocation equations*/
             std::vector<casadi::SX> eq;
-            // State at the end of the collocation interval
+            /*State at the end of the collocation interval*/
             casadi::SX dXf = this->dX_poly.D(0) * this->dX0;
-            // Cost at the end of the collocation interval
+            /*Cost at the end of the collocation interval*/
             casadi::SX Qf = 0;
 
             for (int j = 1; j < this->dX_poly.d + 1; ++j)
             {
                 double dt_j = this->dX_poly.tau_root(j) - this->dX_poly.tau_root(j - 1) * this->h;
-                // Expression for the state derivative at the collocation point
+                /*Expression for the state derivative at the collocation point*/
                 casadi::SX dxp = this->dX_poly.C(0, j) * this->dX0;
                 for (int r = 0; r < this->dX_poly.d; ++r)
                 {
@@ -139,16 +139,18 @@ namespace acro
                 casadi::SX x_c = this->Fint(std::vector<casadi::SX>{this->dX0, this->dXc[j - 1], dt_j}).at(0);
                 casadi::SX u_c = this->U_poly.lagrange_interpolation(this->dX_poly.tau_root(j - 1), this->Uc);
 
-                // Append collocation equations
-                eq.push_back(this->h * F_(std::vector<casadi::SX>{x_c, u_c}).at(0) - dxp);
+                /*Append collocation equations*/
+                eq.push_back(this->h * F(std::vector<casadi::SX>{x_c, u_c}).at(0) - dxp);
 
-                // Add cost contribution
-                Qf += this->dX_poly.B(j) * L_dx(std::vector<casadi::SX>{this->dXc[j]}).at(0) * this->h;
-                Qf += this->U_poly.B(j) * L_u(std::vector<casadi::SX>{u_c}).at(0) * this->h;
+                /*Add cost contribution*/
+                std::vector<casadi::SX> L_out = L(std::vector<casadi::SX>{x_c, u_c});
+                /*This is fine as long as the cost is not related to the Lie Group elements. See the state integrator and dX for clarity*/
+                Qf += this->dX_poly.B(j) * L_out.at(0) * this->h;
+                Qf += this->U_poly.B(j) * L_out.at(1) * this->h;
 
                 dXf += this->dX_poly.D(j) * this->dXc[j - 1];
             }
-            // Implicit discrete-time dynamics
+            /*Implicit discrete-time equations*/
             casadi::Function Feq("feq", std::vector<casadi::SX>{vertcat(this->dXc), this->dX0, vertcat(this->Uc)}, std::vector<casadi::SX>{vertcat(eq)});
             casadi::Function Fxf("fxf", std::vector<casadi::SX>{vertcat(this->dXc), this->dX0, vertcat(this->Uc)}, std::vector<casadi::SX>{dXf});
             casadi::Function Fxq("fxq", std::vector<casadi::SX>{this->Lc, vertcat(this->dXc), this->dX0, vertcat(this->Uc)}, std::vector<casadi::SX>{this->Lc + Qf});
