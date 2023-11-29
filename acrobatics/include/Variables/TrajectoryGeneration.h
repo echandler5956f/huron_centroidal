@@ -2,7 +2,7 @@
 
 namespace variables
 {
-    template <class Sym>
+    template <class Sym = Eigen::VectorXD>
     struct Target
     {
         Target(Sym set_target_vars, States set_state_def) : target_vars(set_target_vars), state_def(set_state_def)
@@ -17,7 +17,7 @@ namespace variables
         Eigen::MatrixXd Q;
     };
 
-    template <class Sym>
+    template <class Sym = Eigen::VectorXD>
     struct InitialCondition
     {
 
@@ -31,7 +31,7 @@ namespace variables
         contact::ContactMode init_mode
     };
 
-    template <class Sym>
+    template <class Sym = Eigen::VectorXD>
     struct ProblemSetup
     {
         //

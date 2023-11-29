@@ -19,6 +19,9 @@ namespace acro
             Eigen::Vector2d polytope_local_chebyshev_center;
         };
 
+
+        SurfaceData CreateInfiniteGround();
+
         template <class T>
         void PointViolation(const SurfaceData &region, const Eigen::Vector2<T> &point, Eigen::VectorX<T> &ineq_violation);
 
@@ -36,7 +39,7 @@ namespace acro
 
         using SurfaceID = int;
 
-        using NO_SURFACE = -1;
+        const SurfaceID NO_SURFACE = -1;
 
         class EnvironmentSurfaces : public std::vector<SurfaceData>
         {

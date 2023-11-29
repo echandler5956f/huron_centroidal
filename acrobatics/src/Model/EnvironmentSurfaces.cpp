@@ -5,6 +5,15 @@ namespace acro
     namespace environment
     {
 
+        SurfaceData CreateInfiniteGround(){
+            SurfaceData infinite_ground; 
+            infinite_ground.origin_z_offset = 0;
+            infinite_ground.A = {0, 0};
+            infinite_ground.b = {0};
+            polytope_local_chebyshev_center = {0,0};
+            return infinite_ground;
+        }
+
         template <class T>
         void PointViolation(const SurfaceData &region, const Eigen::Vector2<T> &point, Eigen::VectorX<T> &ineq_violation)
         {

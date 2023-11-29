@@ -17,6 +17,11 @@ namespace acro
             // Generate combinations of contacts.
             void GenerateContactCombination();
 
+            // ContactCombination getContactCombination(const std::string&);
+            
+            // Referenced by binary value instead
+            ContactCombination getContactCombination(int contact_mask){return contact_combinations[contact_mask];}
+
         private:
             std::vector<std::string> ee_names_;
             // Contact combination "1 2 3", where ee's 1,2, and 3 are in contact is at index with
