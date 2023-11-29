@@ -1,5 +1,10 @@
 #include "Model/LeggedBody.h"
+#include "Model/ContactSequence.h"
+#include "Model/EnvironmentSurfaces.h"
+
 #include "Variables/Trajectory.h"
+#include "Variables/States.h"
+#include "Variables/TrajectoryGeneration.h"
 #include <string>
 using namespace acro;
 
