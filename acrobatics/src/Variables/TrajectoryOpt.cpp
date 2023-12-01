@@ -14,7 +14,7 @@ namespace acro
             {
                 auto ps = PseudospectralSegment(d, phase.knot_points, phase.time_value, &this->state_indices, this->Fint);
                 /*TODO: Fill with user defined functions, and handle global/phase-dependent/time-varying constraints*/
-                std::vector<casadi::Function> G;
+                std::vector<constraint::ConstraintData> G;
                 ps.initialize_expression_graph(this->F, this->L, G);
                 this->trajectory.push_back(ps);
             }

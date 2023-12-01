@@ -1,42 +1,46 @@
 #include <Eigen/Core>
 #include <pinocchio/autodiff/casadi.hpp>
 
-namespace constraint{
+namespace constraint
+{
 
-//The actual implementation is on another branch
-struct ProblemData{};
+    // The actual implementation is on another branch
+    struct ProblemData
+    {
+    };
 
+    struct ConstraintData
+    {
+        Eigen::VectorXi flags;
 
-struct ConstraintData{
-    Eigen::VectorXi flags;
+        // Shoud this be one vector of upper & lower bound, or a casadi function of time to map
+        Eigen::VectorXd upper_bound;
+        Eigen::VectorXd lower_bound;
 
-    //Shoud this be one vector of upper & lower bound, or a casadi function of time to map 
-    Eigen::VectorXd upper_bound;
-    Eigen::VectorXd lower_bound;
+        casadi::Function F;
+    };
 
-    casadi::Function F;
-};
+    class CustomConstraint
+    {
+        CustomConstraint() {}
 
+        virtual ~CustomConstraint() = default;
 
-class CustomConstraintBuilder{
-    CustomConstraint(){}
+        void BuildConstraint(const ProblemData &problem_data, ConstraintData &constraint_data)
+        {
+            CreateFlags(problem_data, constraint_data.flags);
+            CreateBounds(problem_data, constraint_data.upper_bound, constraint_data.lower_bound);
+            CreateFunction(problem_data, constraint_data.F);
+        }
 
-    virtual ~CustomConstraint() = default;
+        // Generate flags for each collocation point
+        virtual void CreateFlags(const ProblemData &problem_data, Eigen::VectorXi &flags) const;
 
-    void BuildConstraint(const ProblemData& problem_data, ConstraintData& constraint_data){
-        CreateFlags(problem_data, constraint_data.flags );
-        CreateBounds(problem_data, constraint_data.upper_bound, constraint_data.lower_bound);
-        CreateFunction(problem_data, constraint_data.F);
-    }
+        // Generate bounds for a vector of concatinated collocation points
+        virtual void CreateBounds(const ProblemData &problem_data, Eigen::VectorXd &upper_bound, Eigen::VectorXd &lower_bound) const;
 
-    // Generate flags for each collocation point 
-    virtual void CreateFlags(const ProblemData& problem_data, Eigen::VectorXi& flags) const;
-    
-    //Generate bounds for a vector of concatinated collocation points
-    virtual void CreateBounds(const ProblemData& problem_data, Eigen::VectorXd& upper_bound, Eigen::VectorXd& lower_bound) const;
-    
-    // Generate a function to evaluate each collocation point.
-    virtual void CreateFunction(const ProblemData& problem_data, casadi::Function& F) const ;
-};
+        // Generate a function to evaluate each collocation point.
+        virtual void CreateFunction(const ProblemData &problem_data, casadi::Function &F) const;
+    };
 
 };

@@ -116,7 +116,7 @@ namespace acro
             }
         }
 
-        void PseudospectralSegment::initialize_expression_graph(casadi::Function F, casadi::Function L, std::vector<casadi::Function> G)
+        void PseudospectralSegment::initialize_expression_graph(casadi::Function F, casadi::Function L, std::vector<constraint::ConstraintData> G)
         {
             /*Collocation equations*/
             std::vector<casadi::SX> eq;
@@ -170,7 +170,7 @@ namespace acro
             tmp_dx.push_back(this->dX0); /*If we are doing this for state, is the size right for U?*/
             for (auto g : G)
             {
-                auto tmp_map = g.map(this->dX_poly.d, "serial")(std::vector<casadi::SX>{vertcat(tmp_dx), vertcat(u_at_c)});
+                auto tmp_map = g.F.map(this->dX_poly.d, "serial")(std::vector<casadi::SX>{vertcat(tmp_dx), vertcat(u_at_c)});
                 this->general_constraint_maps.push_back(casadi::Function("fg",
                                                                          std::vector<casadi::SX>{vertcat(tmp_dx), vertcat(this->Uc)},
                                                                          std::vector<casadi::SX>{vertcat(tmp_map)})
