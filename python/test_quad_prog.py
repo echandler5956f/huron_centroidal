@@ -22,15 +22,53 @@ import rospy
 from gazebo_msgs.srv import SpawnModel
 
 
-xc = None
-vc = None
+xc = np.zeros((19, 1))
+vc = np.zeros((18, 1))
 
 
 def joint_callback(data):
+# 0 l_ankle_pitch_joint
+# 1 l_ankle_roll_joint
+# 2 l_hip_pitch_joint
+# 3 l_hip_roll_joint
+# 4 l_hip_yaw_joint
+# 5 l_knee_pitch_joint
+# 6 r_ankle_pitch_joint
+# 7 r_ankle_roll_joint
+# 8 r_hip_pitch_joint
+# 9 r_hip_roll_joint
+# 10 r_hip_yaw_joint
+# 11 r_knee_pitch_joint
     global xc, vc, tauc
-    xc = data.position
-    vc = data.velocity
-    # print('Got joint data')
+    pos = data.position
+    vel = data.velocity
+    xc[0] = pos[4]
+    xc[1] = pos[3]
+    xc[2] = pos[2]
+    xc[3] = pos[5]
+    xc[4] = pos[0]
+    xc[5] = pos[1]
+
+    xc[6] = pos[10]
+    xc[7] = pos[9]
+    xc[8] = pos[8]
+    xc[9] = pos[11]
+    xc[10] = pos[6]
+    xc[11] = pos[7]
+
+    vc[0] = vel[4]
+    vc[1] = vel[3]
+    vc[2] = vel[2]
+    vc[3] = vel[5]
+    vc[4] = vel[0]
+    vc[5] = vel[1]
+
+    vc[6] = vel[10]
+    vc[7] = vel[9]
+    vc[8] = vel[8]
+    vc[9] = pos[11]
+    vc[10] = vel[6]
+    vc[11] = vel[7]
 
 
 class SimpleInterface:
@@ -43,27 +81,27 @@ class SimpleInterface:
             None,
         )
         self.robot.q0 = np.array(
-            [
-                0,
-                0,
-                1.0627,
-                0,
-                0,
-                0,
-                1,
-                0.0000,
-                0.0000,
-                -0.3207,
-                0.7572,
-                -0.4365,
-                0.0000,
-                0.0000,
-                0.0000,
-                -0.3207,
-                0.7572,
-                -0.4365,
-                0.0000,
-            ]
+        [
+            0,
+            0,
+            1.1064,
+            0,
+            0,
+            0,
+            1,
+            0.0000,
+            0.0000,
+            -0.1672,
+            0.3922,
+            -0.2251,
+            0.0000,
+            0.0000,
+            0.0000,
+            -0.1672,
+            0.3922,
+            -0.2251,
+            0.0000,
+        ]
         )
 
         self.model = self.robot.model
@@ -131,31 +169,35 @@ class SimpleInterface:
 def main():
     global xc, vc, tauc
 
-    print("Start SimpleInterface setup")
-
-    q0 = np.array(
+    q0 = np.reshape(np.array(
         [
             0,
             0,
-            1.0627,
+            1.1064,
             0,
             0,
             0,
             1,
             0.0000,
             0.0000,
-            -0.3207,
-            0.7572,
-            -0.4365,
+            -0.1672,
+            0.3922,
+            -0.2251,
             0.0000,
             0.0000,
             0.0000,
-            -0.3207,
-            0.7572,
-            -0.4365,
+            -0.1672,
+            0.3922,
+            -0.2251,
             0.0000,
         ]
-    )
+    ), (19, 1))
+
+    xc = q0
+    vc = np.zeros((18, 1))
+
+    print("Start SimpleInterface setup")
+
     ibrahim = SimpleInterface()
 
     model = ibrahim.model
@@ -178,7 +220,7 @@ def main():
 
     rospy.Subscriber("/huron/joint_states", JointState, joint_callback, queue_size=100)
     tau_publisher = rospy.Publisher(
-        "/huron/joint_group_effort_controller/command", Float64MultiArray
+        "/huron/joint_group_effort_controller/command", Float64MultiArray, queue_size=100
     )
     rospy.init_node("ibrahim_test", anonymous=True)
 
@@ -269,7 +311,8 @@ def main():
             ca.vertcat(
                 # ca.mtimes(J1, cddq) + ca.mtimes(J1dot, cdq),# - ca.mtimes(0. * np.zeros(6), ca.mtimes(J1, cdq)),
                 # ca.mtimes(J2, cddq) + ca.mtimes(J2dot, cdq) #- ca.mtimes(0. * np.zeros(6), ca.mtimes(J2, cdq))
-                acc1, acc2
+                acc1,
+                acc2,
             )
         ],
     )
@@ -288,20 +331,12 @@ def main():
     vcontact_l = ca.Function(
         "vcontact_l",
         [cq, cdq],
-        [
-            cpin.getFrameVelocity(
-                cmodel, cdata, l_ID, pin.LOCAL
-            ).vector
-        ],
+        [cpin.getFrameVelocity(cmodel, cdata, l_ID, pin.LOCAL).vector],
     )
     vcontact_r = ca.Function(
         "vcontact_r",
         [cq, cdq],
-        [
-            cpin.getFrameVelocity(
-                cmodel, cdata, r_ID, pin.LOCAL
-            ).vector
-        ],
+        [cpin.getFrameVelocity(cmodel, cdata, r_ID, pin.LOCAL).vector],
     )
     xc = q0[7:]
     vc = np.zeros((12, 1))
@@ -317,8 +352,8 @@ def main():
         o = ms.pose.orientation
         vl = ms.twist.linear
         al = ms.twist.angular
-        q = np.hstack(([p.x, p.y, p.z, o.x, o.y, o.z, o.w], xc))
-        v = np.hstack(([vl.x, vl.y, vl.z, al.x, al.y, al.z], vc))
+        q = np.vstack((np.reshape(np.array([p.x, p.y, p.z, o.x, o.y, o.z, o.w]), (7, 1)), xc))
+        v = np.vstack((np.reshape(np.array([vl.x, vl.y, vl.z, al.x, al.y, al.z]), (6, 1)), vc))
 
         # desired conf
         q_des = q0  # for bending knee configuration
@@ -327,7 +362,7 @@ def main():
         qdotdot_ref = np.zeros((18, 1))
         # reference com
         c_r = np.array(
-            [[0.04812307], [0.11514324], [0.59731715]]
+            [[0.0255], [0.0], [0.6244]]
         )  # for bending knee configuration
 
         # current com
@@ -359,11 +394,13 @@ def main():
         # desired angular momentum change (Eq. 9)
         Hdot_des = np.zeros((3, 1))
         # desired acceleration (Eq. 11)
-        qdotdot_des = (
-            k_t * (np.reshape(pin.difference(model, q_des, q_cur), (18, 1)))
-            + d_t * (qdot_des - qdot_cur)
-            + qdotdot_ref
-        )
+        # qdotdot_des = (
+        #     k_t * (np.reshape(pin.difference(model, q_des, q_cur), (18, 1)))
+        #     + d_t * (qdot_des - qdot_cur)
+        #     + qdotdot_ref
+        # )
+        qdotdot_des = 240.0*np.reshape((q_des[7:] - q_cur[7:]), (12, 1))
+        # print(qdotdot_des)
 
         # print("Start opti")
 
@@ -380,11 +417,12 @@ def main():
         objective = 0
         # objective = ca.sumsqr(w3 * (qdotdot_des - var_ddq)) + ca.sumsqr(var_tau)
         objective = objective + (
-            # beta1 * ca.sumsqr(w1 * (Hdot_des - kdot_fun(q_cur, qdot_cur, var_ddq)))
-            # beta2 * ca.sumsqr(w2 * (Ldot_des - ldot_fun(q_cur, qdot_cur, var_ddq)))
-            beta3 * ca.sumsqr(w3 * (qdotdot_des - var_ddq))
+            beta1 * ca.sumsqr(w1 * (Hdot_des - kdot_fun(q_cur, qdot_cur, var_ddq)))
+            + beta2 * ca.sumsqr(w2 * (Ldot_des - ldot_fun(q_cur, qdot_cur, var_ddq)))
+            + ca.sumsqr((qdotdot_des - var_ddq[6:]))
             + ca.sumsqr(var_tau)
         )
+        # print(objective)
 
         # activate the acceleration contraint
         opti.subject_to(acc_constraint(q_cur, qdot_cur, var_ddq) == 0)
@@ -397,7 +435,9 @@ def main():
         g_dyn = ca.reshape(g_dyn, 18, 1)
 
         A_dyn = ca.vertcat(
-            ca.horzcat(M_dyn, -S_dyn.T, -J1num.T, -J2num.T),
+            ca.horzcat(
+                M_dyn, -S_dyn.transpose(), -J1num.transpose(), -J2num.transpose()
+            ),
         )
         b_dyn = -C_dyn - g_dyn  # Right-hand side of the linear equality
 

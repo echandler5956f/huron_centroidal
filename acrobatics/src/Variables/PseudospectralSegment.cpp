@@ -87,13 +87,13 @@ namespace acro
 
             for (int j = 0; j < d; ++j)
             {
-                this->dXc.push_back(casadi::SX::sym("Xc_" + std::to_string(j), this->st_m->ndx, 1));
+                this->dXc.push_back(casadi::SX::sym("dXc_" + std::to_string(j), this->st_m->ndx, 1));
                 if (j < d - 1)
                 {
                     this->Uc.push_back(casadi::SX::sym("Uc_" + std::to_string(j), this->st_m->nu, 1));
                 }
             }
-            this->dX0 = casadi::SX::sym("X0", this->st_m->ndx, 1);
+            this->dX0 = casadi::SX::sym("dX0", this->st_m->ndx, 1);
             this->Lc = casadi::SX::sym("Lc", 1, 1);
         }
 
@@ -118,13 +118,14 @@ namespace acro
 
         void PseudospectralSegment::initialize_expression_graph(casadi::Function F, casadi::Function L, std::vector<casadi::Function> G)
         {
-
             /*Collocation equations*/
             std::vector<casadi::SX> eq;
             /*State at the end of the collocation interval*/
             casadi::SX dXf = this->dX_poly.D(0) * this->dX0;
             /*Cost at the end of the collocation interval*/
             casadi::SX Qf = 0;
+            /*U interpolated at the dx polynomial collocation points*/
+            std::vector<casadi::SX> u_at_c;
 
             for (int j = 1; j < this->dX_poly.d + 1; ++j)
             {
@@ -138,6 +139,7 @@ namespace acro
 
                 casadi::SX x_c = this->Fint(std::vector<casadi::SX>{this->dX0, this->dXc[j - 1], dt_j}).at(0);
                 casadi::SX u_c = this->U_poly.lagrange_interpolation(this->dX_poly.tau_root(j - 1), this->Uc);
+                u_at_c.push_back(u_c);
 
                 /*Append collocation equations*/
                 eq.push_back(this->h * F(std::vector<casadi::SX>{x_c, u_c}).at(0) - dxp);
@@ -168,7 +170,7 @@ namespace acro
             tmp_dx.push_back(this->dX0); /*If we are doing this for state, is the size right for U?*/
             for (auto g : G)
             {
-                auto tmp_map = g.map(this->dX_poly.d, "serial")(std::vector<casadi::SX>{vertcat(tmp_dx), vertcat(this->Uc)});
+                auto tmp_map = g.map(this->dX_poly.d, "serial")(std::vector<casadi::SX>{vertcat(tmp_dx), vertcat(u_at_c)});
                 this->general_constraint_maps.push_back(casadi::Function("fg",
                                                                          std::vector<casadi::SX>{vertcat(tmp_dx), vertcat(this->Uc)},
                                                                          std::vector<casadi::SX>{vertcat(tmp_map)})

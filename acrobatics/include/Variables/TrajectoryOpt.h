@@ -35,6 +35,9 @@ namespace acro
             casadi::Function L;
             casadi::Function Phi;
 
+            casadi::Dict opts;
+            casadi::Function solver;
+
             /*Slicer to get the states*/
             States state_indices;
 

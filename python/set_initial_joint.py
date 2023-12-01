@@ -6,9 +6,6 @@ from geometry_msgs.msg import Point, Quaternion, Pose, Twist, Vector3
 from std_srvs.srv import Empty, EmptyRequest
 import rospy
 
-def setjoints(req):
-    response = SetModelConfigurationRequest()
-
 def main():
     rospy.wait_for_service('/gazebo/set_model_configuration')
     rospy.wait_for_service('/gazebo/set_model_state')
@@ -24,10 +21,10 @@ def main():
     urdf_param_name_ = "$(find xacro)/xacro --inorder '$(find huron_description)/urdf/huron.xacro'"
     joint_names_ = ["l_hip_yaw_joint", "l_hip_roll_joint", "l_hip_pitch_joint", "l_knee_pitch_joint", "l_ankle_pitch_joint", "l_ankle_roll_joint",
                     "r_hip_yaw_joint", "r_hip_roll_joint", "r_hip_pitch_joint", "r_knee_pitch_joint", "r_ankle_pitch_joint", "r_ankle_roll_joint"]
-    pose_ = Pose(position = Point(x = 0, y = 0, z = 1.0627), orientation = Quaternion(x = 0, y = 0, z = 0, w = 1))
+    pose_ = Pose(position = Point(x = 0, y = 0, z = 1.1064), orientation = Quaternion(x = 0, y = 0, z = 0, w = 1))
     twist_ = Twist(linear = Vector3(x = 0, y = 0, z = 0), angular = Vector3(x = 0, y = 0, z = 0))
-    joint_positions_ = [0.0, 0.0, -0.3207, 0.7572, -0.4365, 0.0,
-                        0.0, 0.0, -0.3207, 0.7572, -0.4365, 0.0]
+    joint_positions_ = [0.0, 0.0, -0.1672, 0.3922, -0.2251, 0.0,
+                        0.0, 0.0, -0.1672, 0.3922, -0.2251, 0.0]
     pause_physics_client(EmptyRequest())
     response2 = sms(SetModelStateRequest(ModelState(model_name = model_name_, pose = pose_, twist = twist_)))
     rospy.sleep(2)
