@@ -4,7 +4,7 @@
 #include <string>
 #include <cassert>
 #include "Variables/States.h"
-#include "Constraints/CustomConstraint.h"
+#include "Variables/Constraint.h"
 
 namespace acro
 {
@@ -55,7 +55,7 @@ namespace acro
             void initialize_knot_segments();
 
             /*Build the function graph*/
-            void initialize_expression_graph(casadi::Function F, casadi::Function L, std::vector<constraint::ConstraintData> G);
+            void initialize_expression_graph(casadi::Function F, casadi::Function L, std::vector<std::shared_ptr<ConstraintData>> G);
 
         private:
             /*A pseudospectral finite element is made up of knot segments*/
