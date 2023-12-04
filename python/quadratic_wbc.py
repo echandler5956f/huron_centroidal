@@ -143,6 +143,8 @@ def main():
     pin.computeTotalMass(model, data)
     pin.updateFramePlacements(model, data)
 
+    mass = data.mass[0]
+
     # number of position variables (19)
     nq = model.nq
     # number of velocity variables (18)
@@ -161,10 +163,16 @@ def main():
 
     cpin.centerOfMass(cmodel, cdata, cq, cdq, False)
     cpin.forwardKinematics(cmodel, cdata, cq, cdq, cddq)
+    cpin.computeCentroidalMap(cmodel, cdata, cq)
+    cpin.computeCentroidalMapTimeVariation(cmodel, cdata, cq, cdq)
     cpin.updateFramePlacements(cmodel, cdata)
 
     cpin.computeJointJacobians(cmodel, cdata, cq)
     cpin.computeJointJacobiansTimeVariation(cmodel, cdata, cq, cdq)
+
+    # get CMM and time derivative
+    Ag = cdata.Ag
+    dAg = cdata.dAg
 
     J = cdata.J
     Jdot = cdata.dJ
@@ -259,6 +267,19 @@ def main():
         [ca.vertcat(ca.mtimes(J, cddq) + ca.mtimes(Jdot, cdq))],
     )
 
+     # function for the symbolic angular momentum rate of change
+    Hdot_fun = ca.Function(
+        "ang_mom_dot",
+        [cq, cdq, cddq],
+        [ca.mtimes(Ag[:3, :], cddq) + ca.mtimes(dAg[:3, :], cdq)],
+    )
+    # function for the symbolic linear momentum rate of change
+    Ldot_fun = ca.Function(
+        "lin_mom_dot",
+        [cq, cdq, cddq],
+        [ca.mtimes(Ag[3:, :], cddq) + ca.mtimes(dAg[3:, :], cdq)],
+    )
+
     getM = ca.Function("M", [cq], [ca.vertcat(Msym)])
     getC = ca.Function("C", [cq, cdq], [ca.vertcat(Csym)])
     getG = ca.Function("g", [cq], [ca.vertcat(gsym)])
@@ -272,15 +293,6 @@ def main():
     # print("M:\n", getM(q0))
     # print("C:\n", getC(q0, v0))
     # print("g:\n", getG(q0))
-
-    Kp_body_p = 1.0
-    Kd_body_p = 1.0
-
-    Kp_body_ori = Kp_body_p
-    Kd_body_ori = Kd_body_p
-
-    w_body = 500.0
-    w_joints = 1.0
 
     mu = 0.7
     num_contacts = 2
@@ -303,7 +315,46 @@ def main():
             )
         ],
     )
+    com_ref = ccom(q0)
+    vcom_ref = cvcom(q0, v0)
 
+    # tuning variables
+
+    # damping of the foot contact constraint
+    d_bougemarte = 2e1 
+
+    # k gain of the linear momentum error
+    k_lin = 1e-2
+    # k gain of the qdd base error
+    k_qdd_b = 1e1
+    # k gain of the qdd joint error
+    k_qdd_j = 1e0
+    # d gain of the qdd base error
+    d_qdd_b = 1e1
+    # d gain of the qdd joint error
+    d_qdd_j = 1e-2
+    # d gain of the linear momentum eror
+    d_lin = 1e-2
+
+    # Note (SoS = sum of squares)
+    # weight of each SoS body term 
+    w_body = 1e0
+    # weight of each SoS joint term
+    w_joints = 1e0
+    # weight of each SoS angular momentum term
+    w_angmom = 1e0
+    # weight of each SoS linear momentum term
+    w_linmom = 1e0
+
+    # weight of the body tracking objective
+    beta_body = 5e2
+    # weight of the joint tracking objective
+    beta_joints = 1e0
+    # weight of the angular momentum tracking objective
+    beta_angmom = 1e0
+    # weight of the linear momentum tracking objetive
+    beta_linmom = 1e0
+        
     i = 0
     unpause_physics_client(EmptyRequest())
     marray = Float64MultiArray()
@@ -324,43 +375,40 @@ def main():
         v = np.vstack(
             (np.reshape(np.array([vl.x, vl.y, vl.z, al.x, al.y, al.z]), (6, 1)), vc)
         )
+
         pin.forwardKinematics(model, data, q, v)
-        pdd_body_des = np.zeros((3, 1)) - Kp_body_p * (
-            q[:3] - q0[:3]
-        )  # - Kd_body_p * (v[:3] - v0[:3])
         differ = pin.difference(model, q0, q)
-        # print("differ:\n", differ[:3])
-        oridd_body_des = np.zeros(
-            (3, 1)
-        )  # - Kp_body_ori * (differ[3:6]) - Kd_body_ori * (v[3:6] - v0[3:6])
-        vd_body_des = np.vstack((pdd_body_des, oridd_body_des))
-        qdd_b_des = 10.0 * np.reshape(differ[:6], (6, 1)) + 1e1  * np.reshape(v0[:6] - v[:6], (6,1))
-        qdd_j_des = 1.0 * np.reshape(q0[7:] - q[7:], (12, 1)) + 1e-2 * np.reshape(v0[6:] - v[6:], (12, 1))
+        qdd_b_des = k_qdd_b * np.reshape(differ[:6], (6, 1)) + d_qdd_b * np.reshape(v0[:6] - v[:6], (6,1))
+        qdd_j_des = k_qdd_j * np.reshape(q0[7:] - q[7:], (12, 1)) + d_qdd_j * np.reshape(v0[6:] - v[6:], (12, 1))
+        Ldot_des = k_lin * mass * (com_ref - ccom(q)) - d_lin * mass * (vcom_ref - cvcom(q, v))
+        Hdot_des = np.zeros((3, 1))
+
         opti = ca.Opti("conic")
         var_ddq = opti.variable(nv)
         var_tau = opti.variable(12)
         var_f_left = opti.variable(6)
         var_f_right = opti.variable(6)
+
         objective = 0
-        # objective = objective + ca.sumsqr(var_ddq) #+ w_body * (ca.sumsqr(jac_cost(q, v, var_ddq) - vd_body_des))
         objective = objective + (
-            w_body * ca.sumsqr((qdd_b_des - var_ddq[:6]))
-            + w_joints * ca.sumsqr((qdd_j_des - var_ddq[6:]))
+            beta_body * ca.sumsqr(w_body * (qdd_b_des - var_ddq[:6]))
+            + beta_joints * ca.sumsqr(w_joints * (qdd_j_des - var_ddq[6:]))
+            # + beta_angmom * ca.sumsqr(w_angmom * (Hdot_des - Hdot_fun(q, v, var_ddq)))
+            # + beta_linmom * ca.sumsqr(w_linmom * (Ldot_des - Ldot_fun(q, v, var_ddq)))
             + ca.sumsqr(var_tau)
             # + ca.sumsqr(var_f_left)
             # + ca.sumsqr(var_f_right)
         )
-        # print("vel1: \n", pin.getFrameVelocity(model, data, l_ID, pin.LOCAL).vector)
         opti.subject_to(
             acc1_constraint(q, v, var_ddq)
             == -2.0
-            * np.sqrt(10.0)
+            * np.sqrt(d_bougemarte)
             * pin.getFrameVelocity(model, data, l_ID, pin.LOCAL).vector
         )
         opti.subject_to(
             acc2_constraint(q, v, var_ddq)
             == -2.0
-            * np.sqrt(10.0)
+            * np.sqrt(d_bougemarte)
             * pin.getFrameVelocity(model, data, r_ID, pin.LOCAL).vector
         )
         opti.subject_to(
@@ -383,7 +431,7 @@ def main():
         opti.set_initial(var_f_left, f_guess)
         opti.set_initial(var_f_right, f_guess)
         opti.set_initial(var_tau, tau_guess[6:])
-        opti.bounded(-100, var_tau, 100)
+        opti.bounded(-300, var_tau, 300)
         if i > 0:
             opti.set_initial(opti.x, prev_x)
         opti.minimize(objective)
@@ -396,6 +444,7 @@ def main():
         marray = Float64MultiArray()
         marray.data = optimized_tau
         tau_publisher.publish(marray)
+        print(optimized_tau)
         # print(optimized_fleft)
         # print(optimized_fright)
         # print("mass:\n",data.mass[0])
