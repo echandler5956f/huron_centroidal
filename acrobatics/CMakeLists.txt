@@ -13,3 +13,6 @@ find_package (Eigen3 REQUIRED NO_MODULE)
 # Library
 add_library(biqu-acrobatics SHARED ${sources}) # produce a library used by interface
 target_link_libraries(biqu-acrobatics casadi pinocchio Eigen3::Eigen)
+
+add_executable(test test.cpp)
+target_link_libraries(test biqu-acrobatics)
