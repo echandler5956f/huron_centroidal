@@ -7,41 +7,82 @@ namespace acro
 {
     namespace variables
     {
+        /**
+         * @brief The trajectory optimization class
+         *
+         */
         class TrajectoryOpt
         {
         public:
+            /**
+             * @brief Construct a new Trajectory Opt object
+             *
+             */
             TrajectoryOpt();
 
         private:
+            /**
+             * @brief Initialize the finite elements
+             *
+             * @param contacts The phase sequence
+             * @param d The degree of the finite element polynomials
+             */
             void init_finite_elements(contact::ContactSequence contacts, int d);
 
-            /*A Trajectory is made up of pseudospectral finite elements*/
+            /**
+             * @brief A Trajectory is made up of pseudospectral finite elements
+             *
+             */
             std::vector<PseudospectralSegment> trajectory;
 
-            /*
-            Continuous-time functions:
-                Fint: The decision variables are infinitesimal deviations from the initial state,
+            /**
+             * @brief Continuous-time function. The decision variables are infinitesimal deviations from the initial state,
                 allowing for states to lie on a manifold. Fint is the function which maps these
-                deviations back to the actual state space.
-
-                F: The system dynamics.
-
-                L: The 'running', or integrated cost.
-
-                Phi: The terminal cost.
-            */
+                deviations back to the actual state space
+             *
+             */
             casadi::Function Fint;
+
+            /**
+             * @brief Continuous-time function. This function stores the system dynamics
+             *
+             */
             casadi::Function F;
+
+            /**
+             * @brief The "running" or integrated cost function
+             *
+             */
             casadi::Function L;
+
+            /**
+             * @brief The terminal cost function
+             *
+             */
             casadi::Function Phi;
 
+            /**
+             * @brief Casadi solver options
+             *
+             */
             casadi::Dict opts;
+
+            /**
+             * @brief Nonlinear function solver
+             *
+             */
             casadi::Function solver;
 
-            /*Slicer to get the states*/
+            /**
+             * @brief Slicer to get the states
+             *
+             */
             States state_indices;
 
-            /*Fixed time horizon*/
+            /**
+             * @brief Fixed time horizon of the entire trajectory
+             *
+             */
             double T;
         };
     }
