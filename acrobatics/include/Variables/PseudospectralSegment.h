@@ -106,6 +106,12 @@ namespace acro
         public:
             /**
              * @brief Construct a new Pseudospectral Segment object
+             * 
+             */
+            PseudospectralSegment(){};
+
+            /**
+             * @brief Construct a new Pseudospectral Segment object
              *
              * @param d Polynomial degree
              * @param knot_num_ Number of knots in the segment
@@ -123,8 +129,8 @@ namespace acro
             void initialize_expression_variables(int d);
 
             /**
-             * @brief Initialize the vector of all times which constraints are evaluated at.
-             *
+             * @brief Initialize the vector of all times which constraints are evaluated at
+             * 
              */
             void initialize_time_vector();
 
@@ -166,7 +172,7 @@ namespace acro
             casadi::Function xf_constraint_map;
 
             /**
-             * @brief Implicit discrete-time function map.. The accumulated cost across all the knot segments found using quadrature rules
+             * @brief Implicit discrete-time function map. The accumulated cost across all the knot segments found using quadrature rules
              *
              */
             casadi::Function q_cost_fold;

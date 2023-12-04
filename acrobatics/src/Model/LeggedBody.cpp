@@ -3,15 +3,19 @@
 // Provide the string IDs that correspond to the pinocchio end effector frames.
 void acro::model::LeggedBody::setEndEffectors(const std::vector<std::string> &ee_names)
 {
-    for (int i = 0; i < ee_names.size(); i++)
+    for (int i = 0; i < ee_names.size(); ++i)
     {
         auto &ee_name = ee_names[i];
         assert(existFrame(ee_name));
         // Throw an error otherwise.
+        std::cout << "existFrame" << std::endl;
 
         std::shared_ptr<contact::EndEffector> ee_obj_ptr;
+        std::cout << "std::shared_ptr<contact::EndEffector> ee_obj_ptr" << std::endl;
         ee_obj_ptr->frame_name = ee_name;
+        std::cout << "ee_obj_ptr->frame_name = ee_name" << std::endl;
         ee_obj_ptr->frame_id = getFrameId(ee_name);
+        std::cout << "getFrameId(ee_name)" << std::endl;
 
         // todo : use the jacobian from the body frame to find the actual DOFs of this frame.
         ee_obj_ptr->is_6d = false;
@@ -42,7 +46,7 @@ void acro::model::LeggedBody::GenerateContactCombination()
         // And set the value for each ee in contact to true
         uint mask = 1;
 
-        for (int i = 0; i < num_end_effectors_; i++)
+        for (int i = 0; i < num_end_effectors_; ++i)
         {
             bool ee_i_is_in_contact = (mask & binary_value_combination);
             mask *= 2;
