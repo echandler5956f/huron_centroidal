@@ -4,7 +4,7 @@ namespace acro
 {
     namespace variables
     {
-        void LagrangePolynomial::compute_matrices(int d_, const std::string &scheme)
+        LagrangePolynomial::LagrangePolynomial(int d_, const std::string &scheme)
         {
             assert((d_ > 0) && (d_ < 10) && "Collocation degrees must be positive and no greater than 9");
             this->d = d_;
@@ -47,7 +47,7 @@ namespace acro
                 this->B(j) = pint(1.0);
             }
         }
-    
+
         const casadi::SX LagrangePolynomial::lagrange_interpolation(double t, const std::vector<casadi::SX> terms)
         {
             assert((t >= 0.0) && (t <= 1.0) && "t must be in the range [0,1]");
@@ -84,8 +84,8 @@ namespace acro
             this->dXc.clear();
             this->Uc.clear();
 
-            this->dX_poly.compute_matrices(d);
-            this->U_poly.compute_matrices(d - 1);
+            this->dX_poly = LagrangePolynomial(d);
+            this->U_poly = LagrangePolynomial(d - 1);
 
             for (auto j = 0; j < d; ++j)
             {

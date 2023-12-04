@@ -50,12 +50,12 @@ namespace acro
             LagrangePolynomial(){};
 
             /**
-             * @brief Compute and store the coefficients for a given degree and collocation scheme
+             * @brief Construct a new Lagrange Polynomial object. Compute and store the coefficients for a given degree and collocation scheme
              *
              * @param d_ Degree of the polynomial
              * @param scheme Collocation scheme: "radau" or "legendre"
              */
-            void compute_matrices(int d_, const std::string &scheme = "radau");
+            LagrangePolynomial(int d_, const std::string &scheme = "radau");
 
             /**
              * @brief Perform symbolic Lagrange Interpolation, which, given a time from the Lagrange time scale, interpolates terms to find the value at time t
