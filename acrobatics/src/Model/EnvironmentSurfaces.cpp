@@ -21,10 +21,10 @@ namespace acro
             ineq_violation = region.A * point - region.b;
         }
         template <class T>
-        void PointViolation(const SurfaceData &region, const Eigen::Matrix<T,3,1> &point, Eigen::Matrix<T,Eigen::Dynamic,1> &ineq_violation, Eigen::Matrix<T,Eigen::Dynamic,1> &eq_violation)
+        void PointViolation(const SurfaceData &region, const Eigen::Matrix<T,3,1> &point, Eigen::Matrix<T,Eigen::Dynamic,1> &ineq_violation, Eigen::Matrix<T,1,1> &eq_violation)
         {
             ineq_violation = region.A * point.head(2) - region.b;
-            eq_violation = point.tail(1) - region.origin_z_offset;
+            eq_violation[0] = point.tail(1)[0] - region.origin_z_offset;
         }
 
         bool isInRegion(const SurfaceData &region, const Eigen::Vector2d &point)

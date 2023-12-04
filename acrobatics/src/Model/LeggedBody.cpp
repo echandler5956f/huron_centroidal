@@ -9,7 +9,7 @@ void acro::model::LeggedBody::setEndEffectors(const std::vector<std::string> &ee
         assert(existFrame(ee_name));
         // Throw an error otherwise.
 
-        std::shared_ptr<EndEffector> ee_obj_ptr;
+        std::shared_ptr<contact::EndEffector> ee_obj_ptr;
         ee_obj_ptr->frame_name = ee_name;
         ee_obj_ptr->frame_id = getFrameId(ee_name);
 
@@ -25,9 +25,9 @@ void acro::model::LeggedBody::setEndEffectors(const std::vector<std::string> &ee
 // Generate combinations of contacts.
 void acro::model::LeggedBody::GenerateContactCombination()
 {
-    std::vector<ContactCombination> contact_combinations;
+    std::vector<contact::ContactCombination> contact_combinations;
     // Generate the "basic" (no contact) contact combination.
-    ContactCombination basic_cc;
+    contact::ContactCombination basic_cc;
     for (auto &ee_name : ee_names_)
         basic_cc.insert({ee_name, false});
 
@@ -38,14 +38,15 @@ void acro::model::LeggedBody::GenerateContactCombination()
     for (uint binary_value_combination = 0; binary_value_combination < num_combinations; binary_value_combination++)
     {
         // Copy the no contact cc
-        ContactCombination new_contact_combination = basic_cc;
+       contact::ContactCombination new_contact_combination = basic_cc;
         // And set the value for each ee in contact to true
         uint mask = 1;
-        for (int i = 0; i < this->num_end_effectors; i++)
+
+        for (int i = 0; i < num_end_effectors_; i++)
         {
             bool ee_i_is_in_contact = (mask & binary_value_combination);
             mask *= 2;
-            new_contact_combination[i].second = ee_i_is_in_contact;
+            new_contact_combination[ee_names_[i]] = ee_i_is_in_contact;
         }
         contact_combinations[binary_value_combination] = new_contact_combination;
     }
