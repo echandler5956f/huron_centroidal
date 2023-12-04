@@ -3,6 +3,8 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
+#include <vector>
+
 namespace acro
 {
     namespace environment
@@ -21,42 +23,46 @@ namespace acro
             Eigen::Vector2d polytope_local_chebyshev_center;
         };
 
+
+        SurfaceData CreateInfiniteGround();
+
+        template <class T>
+        void PointViolation(const SurfaceData &region, const Eigen::Matrix<T, 2, 1>&point, Eigen::Matrix<T,Eigen::Dynamic,1> &ineq_violation);
+
+        template <class T>
+        void PointViolation(const SurfaceData &region, const Eigen::Matrix<T, 3, 1> &point, Eigen::Matrix<T,Eigen::Dynamic,1> &ineq_violation, Eigen::Matrix<T,Eigen::Dynamic,1> &eq_violation);
+
+        bool isInRegion(const SurfaceData &region, const Eigen::Vector2d &point);
+
+        bool isOnRegion(const SurfaceData &region, const Eigen::Vector3d &point);
+
         // The chebyshev center of A and b in 3d. WILL NOT WORK IF THE LOCAL CENTER HAS NOT BEEN COMPUTED.
         Eigen::Vector3d getChebyshevCenter(const SurfaceData &surface_data);
-        // {
-        //     // returns the chebychev center in the global frame.
-        //     // (Adds a height component if the surface is gravity aligned and in the global frame)
-
-        //     // Eigen::Vector3d c_center;
-        //     // c_center.head(2) = surface_data.polytope_local_chebyshev_center;
-        //     // c_center.tail(1) = surface_data.origin_z_offset;
-        // }
 
         Eigen::VectorXd CalculateChebyshevCenter(const Eigen::MatrixXd &A, const Eigen::VectorXd &b);
-        // {
-        //     // min (-r)
-        //     // r (scalar)
-        //     // d in Rn
-        //     //  s.t
-        //     //       (r * a_i / ||a_i||) + d  \leq  ||a_i|| * b
-        //     // where a_i = A[i,:] .transpose()
 
-        //     // or
+        using SurfaceID = int;
 
-        //     // min [[-1] [0 0 ... 0]] * x
-        //     // x = [r;d]
-        //     //  s.t [normalized(a_i) I_(nxn)] * r \leq  b~
-        //     // where b~_i = b_i * ||a_i||
+        const SurfaceID NO_SURFACE = -1;
 
-        //     // this is a linear program.
-        // }
+        class EnvironmentSurfaces : public std::vector<SurfaceData>
+        {
+        public:
+            EnvironmentSurfaces() : std::vector<SurfaceData>() {}
 
-        // class EnvironmentSurfaces
-        // {
-        //     // EMPTY FOR NOW; DISCUSS WITH YIFU & LEHONG
-        //     // Get k-closest regions to current; convex program.
-        //     // need a way to define surface and surface identifiers
-        //     // std::vector<SurfaceIdentifiers> LeggedBody::getKClosestRegions(Eigen::Vector3d ee_pos, int k);
-        // };
+            std::vector<SurfaceID> getSurfacesUnder(const Eigen::Vector2d &ee_pos) const;
+
+            std::vector<SurfaceData> getSurfacesFromIDs(const std::vector<SurfaceID> IDs) const;
+
+            // Generate the straight shot trajectory of each limb from the starting to the target
+            // and sample to find surfaces underneath
+
+            // Get k-closest regions to current; convex program.
+            std::vector<SurfaceID>
+            getKClosestRegions(Eigen::Vector3d ee_pos, int k);
+
+            uint num_surface() const { return (*this).size(); }
+        };
+
     }
 }

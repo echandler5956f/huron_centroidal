@@ -1,11 +1,30 @@
 #pragma once
 
 #include "Model/EndEffector.h"
+#include "Model/EnvironmentSurfaces.h"
 
 namespace acro
 {
     namespace contact
     {
+
+        struct ContactMode
+        {
+            enum ContactModeValidity
+            {
+                VALID,
+                SURFACE_NOT_DEFINED,
+                DIFFERING_SIZES
+            };
+            // Gets which EEs are in contact
+            ContactCombination combination_definition;
+
+            // Gets which surfaces the EEs are in contact with
+            std::vector<environment::SurfaceID> contact_surfaces;
+
+            // Makes the combination valid. If an EE is not in contact, it makes the corresponding contact surface NO_SURFACE
+            void MakeValid(ContactModeValidity &validity);
+        };
 
         class ContactSequence
         {
@@ -21,24 +40,24 @@ namespace acro
             // Does the phase timing change? if so, then the _t0_offset and dt_ need to change.
             struct Phase
             {
-                ContactCombination contacts;
+                ContactMode mode;
                 int knot_points = 1;
                 double time_value = 1;
             };
 
-            int addPhase(const ContactCombination &contacts, int knot_points, double dt);
+            int addPhase(const ContactMode &mode, int knot_points, double dt);
 
-            int getPhaseIndexAtTime(double t, CONTACT_SEQUENCE_ERROR &error_status);
+            int getPhaseIndexAtTime(double t, CONTACT_SEQUENCE_ERROR &error_status) const;
 
-            int getPhaseIndexAtKnot(int knot_idx, CONTACT_SEQUENCE_ERROR &error_status);
+            int getPhaseIndexAtKnot(int knot_idx, CONTACT_SEQUENCE_ERROR &error_status) const;
+        
+            const ContactSequence::Phase getPhase(int index) const { return phase_sequence_[index]; }
 
-            int getKnotAtTime(double t, CONTACT_SEQUENCE_ERROR &error_status);
+            void getPhaseAtTime(double t, Phase &phase, CONTACT_SEQUENCE_ERROR &error_status) const;
 
-            void getPhaseAtTime(double t, Phase &phase, CONTACT_SEQUENCE_ERROR &error_status);
+            void getPhaseAtKnot(int knot_idx, Phase &phase, CONTACT_SEQUENCE_ERROR &error_status) const;
 
-            void getPhaseAtKnot(int knot_idx, Phase &phase, CONTACT_SEQUENCE_ERROR &error_status);
-
-            int num_phases();
+            int num_phases() const { return phase_sequence_.size(); }
 
             // we will fill this out as needed.
         // private:
