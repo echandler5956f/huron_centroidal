@@ -1,5 +1,7 @@
 #include "Variables/TrajectoryGeneration.h"
 
+
+namespace acro{
 namespace variables
 {
 
@@ -8,4 +10,5 @@ namespace variables
     {
         return contact_sequence.getPhaseAtKnot(0).mode == init_condition.init_mode;
     }
+}
 }

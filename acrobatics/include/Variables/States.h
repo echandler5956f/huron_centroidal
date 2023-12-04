@@ -9,7 +9,8 @@ namespace acro
         class States
         {
         public:
-            States();
+        
+            States(){}
             States(const int nq_, const int nv_);
 
             static const int nu = 6;

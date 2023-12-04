@@ -47,7 +47,7 @@ namespace acro
              * @brief Construct a new Lagrange Polynomial object
              *
              */
-            LagrangePolynomial();
+            LagrangePolynomial(){};
 
             /**
              * @brief Compute and store the coefficients for a given degree and collocation scheme
