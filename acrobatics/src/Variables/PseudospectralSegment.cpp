@@ -48,7 +48,7 @@ namespace acro
             }
         }
 
-        const casadi::SX LagrangePolynomial::lagrange_interpolation(double t, const std::vector<casadi::SX> terms)
+        const casadi::SX LagrangePolynomial::lagrange_interpolation(double t, const casadi::SXVector terms)
         {
             assert((t >= 0.0) && (t <= 1.0) && "t must be in the range [0,1]");
             casadi::SX result = 0;
@@ -114,33 +114,33 @@ namespace acro
 
         void PseudospectralSegment::initialize_knot_segments()
         {
-            this->traj_segment.clear();
+            this->dXc_var_vec.clear();
+            this->U_var_vec.clear();
+            this->dX0_var_vec.clear();
             for (auto k = 0; k < this->knot_num; ++k)
             {
-                KnotSegment knot_segment_k;
                 for (auto j = 0; j < this->dX_poly.d; ++j)
                 {
-                    knot_segment_k.dXc_var.push_back(casadi::SX::sym("dXc_" + std::to_string(k) + "_" + std::to_string(j), this->st_m->ndx, 1));
+                    this->dXc_var_vec.push_back(casadi::SX::sym("dXc_" + std::to_string(k) + "_" + std::to_string(j), this->st_m->ndx, 1));
                 }
                 for (auto j = 0; j < this->U_poly.d; ++j)
                 {
-                    knot_segment_k.U_var.push_back(casadi::SX::sym("U_" + std::to_string(k) + "_" + std::to_string(j), this->st_m->nu, 1));
+                    this->U_var_vec.push_back(casadi::SX::sym("U_" + std::to_string(k) + "_" + std::to_string(j), this->st_m->nu, 1));
                 }
-                knot_segment_k.dX0_var = casadi::SX::sym("dX0_" + std::to_string(k), this->st_m->ndx, 1);
-                this->traj_segment.push_back(knot_segment_k);
+                this->dX0_var_vec.push_back(casadi::SX::sym("dX0_" + std::to_string(k), this->st_m->ndx, 1));
             }
         }
 
         void PseudospectralSegment::initialize_expression_graph(casadi::Function &F, casadi::Function &L, std::vector<std::shared_ptr<ConstraintData>> G)
         {
             /*Collocation equations*/
-            std::vector<casadi::SX> eq;
+            casadi::SXVector eq;
             /*State at the end of the collocation interval*/
             casadi::SX dXf = this->dX_poly.D(0) * this->dX0;
             /*Cost at the end of the collocation interval*/
             casadi::SX Qf = 0;
             /*U interpolated at the dx polynomial collocation points*/
-            std::vector<casadi::SX> u_at_c;
+            casadi::SXVector u_at_c;
 
             for (auto j = 1; j < this->dX_poly.d + 1; ++j)
             {
@@ -152,15 +152,15 @@ namespace acro
                     dxp += this->dX_poly.C(r + 1, j) * this->dXc[r];
                 }
 
-                casadi::SX x_c = this->Fint(std::vector<casadi::SX>{this->dX0, this->dXc[j - 1], dt_j}).at(0);
+                casadi::SX x_c = this->Fint(casadi::SXVector{this->dX0, this->dXc[j - 1], dt_j}).at(0);
                 casadi::SX u_c = this->U_poly.lagrange_interpolation(this->dX_poly.tau_root(j - 1), this->Uc);
                 u_at_c.push_back(u_c);
 
                 /*Append collocation equations*/
-                eq.push_back(this->h * F(std::vector<casadi::SX>{x_c, u_c}).at(0) - dxp);
+                eq.push_back(this->h * F(casadi::SXVector{x_c, u_c}).at(0) - dxp);
 
                 /*Add cost contribution*/
-                std::vector<casadi::SX> L_out = L(std::vector<casadi::SX>{x_c, u_c});
+                casadi::SXVector L_out = L(casadi::SXVector{x_c, u_c});
                 /*This is fine as long as the cost is not related to the Lie Group elements. See the state integrator and dX for clarity*/
                 Qf += this->dX_poly.B(j) * L_out.at(0) * this->h;
                 Qf += this->U_poly.B(j) * L_out.at(1) * this->h;
@@ -172,20 +172,21 @@ namespace acro
             this->general_ub.resize(N, 1);
             /*Implicit discrete-time equations*/
             this->collocation_constraint_map = casadi::Function("feq",
-                                                                std::vector<casadi::SX>{vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
-                                                                std::vector<casadi::SX>{vertcat(eq)})
+                                                                casadi::SXVector{vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
+                                                                casadi::SXVector{vertcat(eq)})
                                                    .map(this->knot_num, "openmp");
+            /*When you evaluate this map, subtract by the knot points list offset by 1 to be correct*/
             this->xf_constraint_map = casadi::Function("fxf",
-                                                       std::vector<casadi::SX>{vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
-                                                       std::vector<casadi::SX>{dXf})
+                                                       casadi::SXVector{vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
+                                                       casadi::SXVector{dXf})
                                           .map(this->knot_num, "openmp");
 
             this->general_lb(casadi::Slice(0, this->knot_num * 2)) = casadi::DM::zeros(this->knot_num * 2, 1);
             this->general_ub(casadi::Slice(0, this->knot_num * 2)) = casadi::DM::zeros(this->knot_num * 2, 1);
 
             this->q_cost_fold = casadi::Function("fxq",
-                                                 std::vector<casadi::SX>{this->Lc, vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
-                                                 std::vector<casadi::SX>{this->Lc + Qf})
+                                                 casadi::SXVector{this->Lc, vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
+                                                 casadi::SXVector{this->Lc + Qf})
                                     .fold(this->knot_num);
             /*Map the constraint to each collocation point, and then map the mapped constraint to each knot segment*/
             casadi::SXVector tmp_dx = this->dXc;
@@ -194,15 +195,36 @@ namespace acro
             for (auto i = 0; i < G.size(); ++i)
             {
                 auto g_data = G[i];
-                casadi::SXVector tmp_map = g_data->F.map(this->dX_poly.d, "serial")(std::vector<casadi::SX>{vertcat(tmp_dx), vertcat(u_at_c)});
+                casadi::SXVector tmp_map = g_data->F.map(this->dX_poly.d, "serial")(casadi::SXVector{vertcat(tmp_dx), vertcat(u_at_c)});
                 this->general_constraint_maps.push_back(casadi::Function("fg",
-                                                                         std::vector<casadi::SX>{vertcat(tmp_dx), vertcat(this->Uc)},
-                                                                         std::vector<casadi::SX>{vertcat(tmp_map)})
+                                                                         casadi::SXVector{vertcat(tmp_dx), vertcat(this->Uc)},
+                                                                         casadi::SXVector{vertcat(tmp_map)})
                                                             .map(this->knot_num, "openmp"));
 
-                this->general_lb(casadi::Slice(this->knot_num * (i + 2), this->knot_num * (i + 1 + 2))) = vertcat(g_data->lower_bound.map(this->knot_num, "serial")(this->times));
-                this->general_ub(casadi::Slice(this->knot_num * (i + 2), this->knot_num * (i + 1 + 2))) = vertcat(g_data->upper_bound.map(this->knot_num, "serial")(this->times));
+                this->general_lb(casadi::Slice(this->knot_num * (i + 2), this->knot_num * (i + 1 + 2))) =
+                    vertcat(g_data->lower_bound.map(this->knot_num, "serial")(this->times));
+                this->general_ub(casadi::Slice(this->knot_num * (i + 2), this->knot_num * (i + 1 + 2))) =
+                    vertcat(g_data->upper_bound.map(this->knot_num, "serial")(this->times));
             }
+        }
+
+        casadi::SXVector PseudospectralSegment::evaluate_expression_graph(casadi::SX &J0)
+        {
+            casadi::SXVector result;
+            result.push_back(this->collocation_constraint_map(casadi::SXVector{horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0));
+
+            result.push_back(this->xf_constraint_map(casadi::SXVector{horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0) -
+                        vertcat(casadi::SXVector(this->dX0_var_vec.begin() + 1, this->dX0_var_vec.end())));
+            
+            for (auto i = 0; i < this->general_constraint_maps.size(); ++i)
+            {
+                result.push_back(this->general_constraint_maps[i](casadi::SXVector{horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0));
+            }
+
+            auto tmp = this->q_cost_fold(casadi::SXVector{J0, horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0);
+            J0 = tmp;
+
+            return result;
         }
     }
 }
