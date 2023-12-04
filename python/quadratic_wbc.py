@@ -65,9 +65,14 @@ def joint_callback(data):
     vc[10] = vel[6]
     vc[11] = vel[7]
 
+def hook():
+    global tau_publisher
+    marray = Float64MultiArray()
+    marray.data = np.zeros((12, 1))
+    tau_publisher.publish(marray)
 
 def main():
-    global xc, vc
+    global xc, vc, tau_publisher
 
     q0 = np.reshape(
         np.array(
@@ -116,9 +121,7 @@ def main():
     rospy.init_node("ibrahim_test", anonymous=True)
     rospy.wait_for_service("/gazebo/unpause_physics")
 
-    # marray = Float64MultiArray()
-    # marray.data = np.zeros((12, 1))
-    # tau_publisher.publish(marray)
+    rospy.on_shutdown(hook)
 
     builder = RobotWrapper.BuildFromURDF
     robot = builder(
@@ -263,12 +266,7 @@ def main():
     getStaticTorque = ca.Function(
         "static_tau",
         [cq, cdq, cf_left, cf_right],
-        [
-            ca.vertcat(
-                gsym
-                - ca.mtimes(
-                    ca.transpose(J), cf_left + cf_right))
-        ],
+        [ca.vertcat(gsym - ca.mtimes(ca.transpose(J), cf_left + cf_right))],
     )
 
     # print("M:\n", getM(q0))
@@ -281,16 +279,17 @@ def main():
     Kp_body_ori = Kp_body_p
     Kd_body_ori = Kd_body_p
 
-    w_body = 1.0
+    w_body = 500.0
+    w_joints = 1.0
 
     mu = 0.7
     num_contacts = 2
     A_i = np.asarray(
         [
-            [1, 0, -mu, 0, 0, 0],  # pyramid approximation of CWC for one
-            [-1, 0, -mu, 0, 0, 0],  # contact force f \in R^3
-            [0, 1, -mu, 0, 0, 0],
-            [0, -1, -mu, 0, 0, 0],
+            [0, 0, 0, 1, 0, -mu],  # pyramid approximation of CWC for one
+            [0, 0, 0, -1, 0, -mu],  # contact force f \in R^3
+            [0, 0, 0, 0, 1, -mu],
+            [0, 0, 0, 0, -1, -mu],
         ]
     )
     fric_constraint = ca.Function(
@@ -307,6 +306,9 @@ def main():
 
     i = 0
     unpause_physics_client(EmptyRequest())
+    marray = Float64MultiArray()
+    marray.data = np.zeros((12, 1))
+    tau_publisher.publish(marray)
     while True:
         # for i in range(10):
         ms = get_model_state_client(
@@ -342,8 +344,8 @@ def main():
         objective = 0
         # objective = objective + ca.sumsqr(var_ddq) #+ w_body * (ca.sumsqr(jac_cost(q, v, var_ddq) - vd_body_des))
         objective = objective + (
-            ca.sumsqr((qdd_b_des - var_ddq[:6]))
-            + ca.sumsqr((qdd_j_des - var_ddq[6:]))
+            w_body * ca.sumsqr((qdd_b_des - var_ddq[:6]))
+            + w_joints * ca.sumsqr((qdd_j_des - var_ddq[6:]))
             + ca.sumsqr(var_tau)
             # + ca.sumsqr(var_f_left)
             # + ca.sumsqr(var_f_right)
@@ -394,7 +396,6 @@ def main():
         marray = Float64MultiArray()
         marray.data = optimized_tau
         tau_publisher.publish(marray)
-        print(optimized_tau)
         # print(optimized_fleft)
         # print(optimized_fright)
         # print("mass:\n",data.mass[0])
