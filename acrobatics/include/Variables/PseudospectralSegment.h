@@ -11,30 +11,6 @@ namespace acro
 {
     namespace variables
     {
-        /**
-         * @brief Knot segments which Pseudospectral Segments are composed o
-         *
-         */
-        struct KnotSegment
-        {
-            /**
-             * @brief Collocation state decision variables
-             *
-             */
-            casadi::SXVector dXc_var;
-
-            /**
-             * @brief Collocation input decision variables
-             *
-             */
-            casadi::SXVector U_var;
-
-            /**
-             * @brief Knot point state decision variables
-             *
-             */
-            casadi::SX dX0_var;
-        };
 
         /**
          * @brief Helper class for storing polynomial information
@@ -158,11 +134,6 @@ namespace acro
             casadi::SXVector evaluate_expression_graph(casadi::SX &J0);
 
         private:
-            // /**
-            //  * @brief A pseudospectral finite element is made up of knot segments
-            //  *
-            //  */
-            // std::vector<KnotSegment> traj_segment;
 
             /**
              * @brief Collocation state decision variables
