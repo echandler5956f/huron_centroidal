@@ -21,13 +21,13 @@ namespace acro
              * @brief Collocation state decision variables
              *
              */
-            std::vector<casadi::SX> dXc_var;
+            casadi::SXVector dXc_var;
 
             /**
              * @brief Collocation input decision variables
              *
              */
-            std::vector<casadi::SX> U_var;
+            casadi::SXVector U_var;
 
             /**
              * @brief Knot point state decision variables
@@ -64,7 +64,7 @@ namespace acro
              * @param terms Terms at knot points to use for interpolation
              * @return const casadi::SX Resultant expression for the symbolic interpolated value
              */
-            const casadi::SX lagrange_interpolation(double t, const std::vector<casadi::SX> terms);
+            const casadi::SX lagrange_interpolation(double t, const casadi::SXVector terms);
 
             /**
              * @brief Degree of the polynomial
@@ -106,7 +106,7 @@ namespace acro
         public:
             /**
              * @brief Construct a new Pseudospectral Segment object
-             * 
+             *
              */
             PseudospectralSegment(){};
 
@@ -130,7 +130,7 @@ namespace acro
 
             /**
              * @brief Initialize the vector of all times which constraints are evaluated at
-             * 
+             *
              */
             void initialize_time_vector();
 
@@ -149,12 +149,38 @@ namespace acro
              */
             void initialize_expression_graph(casadi::Function &F, casadi::Function &L, std::vector<std::shared_ptr<ConstraintData>> G);
 
-        private:
             /**
-             * @brief A pseudospectral finite element is made up of knot segments
+             * @brief Evaluate the expressions with the actual decision variables
+             * 
+             * @param J0 Accumulated cost so far
+             * @return casadi::SXVector Resultant expression vector
+             */
+            casadi::SXVector evaluate_expression_graph(casadi::SX &J0);
+
+        private:
+            // /**
+            //  * @brief A pseudospectral finite element is made up of knot segments
+            //  *
+            //  */
+            // std::vector<KnotSegment> traj_segment;
+
+            /**
+             * @brief Collocation state decision variables
              *
              */
-            std::vector<KnotSegment> traj_segment;
+            casadi::SXVector dXc_var_vec;
+
+            /**
+             * @brief Collocation input decision variables
+             *
+             */
+            casadi::SXVector U_var_vec;
+
+            /**
+             * @brief Knot point state decision variables
+             *
+             */
+            casadi::SXVector dX0_var_vec;
 
             /**
              * @brief Implicit discrete-time function map. This function map returns the vector of collocation equations
@@ -205,13 +231,13 @@ namespace acro
              * @brief Collocation states used to build the expression graphs
              *
              */
-            std::vector<casadi::SX> dXc;
+            casadi::SXVector dXc;
 
             /**
              * @brief Collocation inputs used to build the expression graphs
              *
              */
-            std::vector<casadi::SX> Uc;
+            casadi::SXVector Uc;
 
             /**
              * @brief Knot states used to build the expression graphs
