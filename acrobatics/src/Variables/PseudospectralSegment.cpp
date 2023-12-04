@@ -47,8 +47,8 @@ namespace acro
                 this->B(j) = pint(1.0);
             }
         }
-
-        casadi::SX LagrangePolynomial::lagrange_interpolation(double t, std::vector<casadi::SX> terms)
+    
+        const casadi::SX LagrangePolynomial::lagrange_interpolation(double t, const std::vector<casadi::SX> terms)
         {
             assert((t >= 0.0) && (t <= 1.0) && "t must be in the range [0,1]");
             casadi::SX result = 0;

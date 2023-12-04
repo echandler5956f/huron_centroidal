@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 d = 2
 
 # Get collocation points
-tau_root = np.append(0, ca.collocation_points(d, 'legendre'))
+tau_root = np.append(0, ca.collocation_points(d, 'radau'))
 
 # Coefficients of the collocation equation
 C = np.zeros((d+1,d+1))

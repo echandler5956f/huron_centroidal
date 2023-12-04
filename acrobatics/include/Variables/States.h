@@ -20,61 +20,61 @@ namespace acro
 
             /*Momenta: nh x 1*/
             template <class Sym>
-            Sym get_ch(Sym cx)
+            const Sym get_ch(const Sym &cx)
             {
                 return cx(casadi::Slice(0, this->nh));
             }
             /*Momenta delta: nh x 1*/
             template <class Sym>
-            Sym get_ch_d(Sym cdx)
+            const Sym get_ch_d(const Sym &cdx)
             {
                 return cdx(casadi::Slice(0, this->ndh));
             }
             /*Momenta time derivative: nh x 1*/
             template <class Sym>
-            Sym get_cdh(Sym cx)
+            const Sym get_cdh(const Sym &cx)
             {
                 return cx(casadi::Slice(this->nh, this->ndh));
             }
             /*Momentum time derivative delta: nh x 1*/
             template <class Sym>
-            Sym get_cdh_d(Sym cdx)
+            const Sym get_cdh_d(const Sym &cdx)
             {
                 return cdx(casadi::Slice(this->nh, this->ndh));
             }
             /*q: nq x 1*/
             template <class Sym>
-            Sym get_q(Sym cx)
+            const Sym get_q(const Sym &cx)
             {
                 return cx(casadi::Slice(this->ndh, this->ndh + this->nq));
             }
             /*q delta: nv x 1*/
             template <class Sym>
-            Sym get_q_d(Sym cdx)
+            const Sym get_q_d(const Sym &cdx)
             {
                 return cdx(casadi::Slice(this->ndh, this->ndh + this->nv));
             }
             /*qj: (nq - 7) x 1*/
             template <class Sym>
-            Sym get_qj(Sym cx)
+            const Sym get_qj(const Sym &cx)
             {
                 return cx(casadi::Slice(this->ndh + this->nqb, this->ndh + this->nq));
             }
             /*v: nv x 1*/
             template <class Sym>
-            Sym get_v(Sym cx)
+            const Sym get_v(const Sym &cx)
             {
                 return cx(casadi::Slice(this->ndh + this->nq, this->nx));
             }
             /*v delta: nv x 1*/
             template <class Sym>
-            Sym get_v_d(Sym cdx)
+            const Sym get_v_d(const Sym &cdx)
             {
                 return cdx(casadi::Slice(this->ndh + this->nv, this->ndx));
             }
             /*v_j: (nv - 6) x 1*/
             template <class Sym>
-            Sym get_vj(Sym cx)
+            const Sym get_vj(const Sym &cx)
             {
                 return cx(casadi::Slice(this->ndh + this->nq + this->nvb, this->nx));
             }
