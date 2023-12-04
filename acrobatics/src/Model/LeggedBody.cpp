@@ -10,7 +10,7 @@ void acro::model::LeggedBody::setEndEffectors(const std::vector<std::string> &ee
         // Throw an error otherwise.
         std::cout << "existFrame" << std::endl;
 
-        std::shared_ptr<contact::EndEffector> ee_obj_ptr;
+        std::shared_ptr<contact::EndEffector> ee_obj_ptr = std::make_shared<contact::EndEffector>();
         std::cout << "std::shared_ptr<contact::EndEffector> ee_obj_ptr" << std::endl;
         ee_obj_ptr->frame_name = ee_name;
         std::cout << "ee_obj_ptr->frame_name = ee_name" << std::endl;
