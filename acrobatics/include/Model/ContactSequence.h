@@ -45,15 +45,17 @@ namespace acro
 
             int addPhase(const ContactMode &mode, int knot_points, double dt);
 
-            int getPhaseIndexAtTime(double t, CONTACT_SEQUENCE_ERROR &error_status);
+            int getPhaseIndexAtTime(double t, CONTACT_SEQUENCE_ERROR &error_status) const;
 
-            int getPhaseIndexAtKnot(int knot_idx, CONTACT_SEQUENCE_ERROR &error_status);
+            int getPhaseIndexAtKnot(int knot_idx, CONTACT_SEQUENCE_ERROR &error_status) const;
+        
+            const ContactSequence::Phase getPhase(int index) const { return phase_sequence_[index]; }
 
-            void getPhaseAtTime(double t, Phase &phase, CONTACT_SEQUENCE_ERROR &error_status);
+            void getPhaseAtTime(double t, Phase &phase, CONTACT_SEQUENCE_ERROR &error_status) const;
 
-            void getPhaseAtKnot(int knot_idx, Phase &phase, CONTACT_SEQUENCE_ERROR &error_status);
+            void getPhaseAtKnot(int knot_idx, Phase &phase, CONTACT_SEQUENCE_ERROR &error_status) const;
 
-            int num_phases() { return phase_sequence.size(); }
+            int num_phases() const { return phase_sequence_.size(); }
 
             // we will fill this out as needed.
         private:

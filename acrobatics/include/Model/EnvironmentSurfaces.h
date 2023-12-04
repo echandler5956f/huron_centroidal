@@ -1,6 +1,8 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
+#include <vector>
+
 namespace acro
 {
     namespace environment
@@ -23,10 +25,10 @@ namespace acro
         SurfaceData CreateInfiniteGround();
 
         template <class T>
-        void PointViolation(const SurfaceData &region, const Eigen::Vector2<T> &point, Eigen::VectorX<T> &ineq_violation);
+        void PointViolation(const SurfaceData &region, const Eigen::Matrix<T, 2, 1>&point, Eigen::Matrix<T,Eigen::Dynamic,1> &ineq_violation);
 
         template <class T>
-        void PointViolation(const SurfaceData &region, const Eigen::Vector3<T> &point, Eigen::VectorX<T> &ineq_violation, Eigen::VectorX<T> &eq_violation);
+        void PointViolation(const SurfaceData &region, const Eigen::Matrix<T, 3, 1> &point, Eigen::Matrix<T,Eigen::Dynamic,1> &ineq_violation, Eigen::Matrix<T,Eigen::Dynamic,1> &eq_violation);
 
         bool isInRegion(const SurfaceData &region, const Eigen::Vector2d &point);
 
@@ -44,11 +46,11 @@ namespace acro
         class EnvironmentSurfaces : public std::vector<SurfaceData>
         {
         public:
-            EnvironmentSurfaces() : std::vector<SurfaceData> {}
+            EnvironmentSurfaces() : std::vector<SurfaceData>() {}
 
-            std::vector<SurfaceID> getSurfacesUnder(const Eigen::Vector2d &ee_pos);
+            std::vector<SurfaceID> getSurfacesUnder(const Eigen::Vector2d &ee_pos) const;
 
-            std::vector<SurfaceData> getSurfacesFromIDs(const std::vector<SurfaceID> IDs);
+            std::vector<SurfaceData> getSurfacesFromIDs(const std::vector<SurfaceID> IDs) const;
 
             // Generate the straight shot trajectory of each limb from the starting to the target
             // and sample to find surfaces underneath

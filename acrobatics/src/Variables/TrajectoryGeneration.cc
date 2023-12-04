@@ -1,4 +1,4 @@
-#include "TrajectoryGeneration.h"
+#include "Variables/TrajectoryGeneration.h"
 
 namespace variables
 {
