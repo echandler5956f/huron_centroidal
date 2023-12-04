@@ -5,6 +5,7 @@
 #include <cassert>
 #include "Variables/States.h"
 #include "Variables/Constraint.h"
+#include <Eigen/Sparse>
 
 namespace acro
 {
@@ -46,16 +47,19 @@ namespace acro
         {
         public:
             /*Constructor takes a polynomial degree d, a number of knot segments knot_num_, a period of each knot segment h_, a pointer to the state index helper state_indices_, integrator function*/
-            PseudospectralSegment(int d, int knot_num_, double h_, States *state_indices_, casadi::Function Fint_);
+            PseudospectralSegment(int d, int knot_num_, double h_, States *state_indices_, casadi::Function &Fint_);
 
             /*Initialize the relevant expressions*/
             void initialize_expression_variables(int d);
+
+            /*Initialize the vector of all times*/
+            void initialize_time_vector();
 
             /*Create all the knot segments*/
             void initialize_knot_segments();
 
             /*Build the function graph*/
-            void initialize_expression_graph(casadi::Function F, casadi::Function L, std::vector<std::shared_ptr<ConstraintData>> G);
+            void initialize_expression_graph(casadi::Function &F, casadi::Function &L, std::vector<std::shared_ptr<ConstraintData>> G);
 
         private:
             /*A pseudospectral finite element is made up of knot segments*/
@@ -78,6 +82,8 @@ namespace acro
             casadi::Function xf_constraint_map;
             casadi::Function q_cost_fold;
             std::vector<casadi::Function> general_constraint_maps;
+            casadi::DM general_lb;
+            casadi::DM general_ub;
 
             casadi::Function Fint;
 
@@ -96,8 +102,12 @@ namespace acro
 
             /*Number of knot segments*/
             int knot_num;
+            /*Vector of all times*/
+            casadi::DM times;
             /*Period of EACH KNOT SEGMENT within this pseudospectral segment*/
             double h;
+            /*Total period (helper variable calculated from h and knot_num)*/
+            double T;
         };
     }
 }

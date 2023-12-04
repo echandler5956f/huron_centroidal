@@ -3,7 +3,7 @@
 #include <string>
 #include <memory>
 #include <map>
-#include "EnvironmentSurfaces.h"
+#include "Model/EnvironmentSurfaces.h"
 
 #include <pinocchio/multibody/fwd.hpp>
 

@@ -18,8 +18,8 @@ namespace acro
             Eigen::VectorXi flags;
 
             // Shoud this be one vector of upper & lower bound, or a casadi function of time to map
-            Eigen::VectorXd upper_bound;
-            Eigen::VectorXd lower_bound;
+            casadi::Function upper_bound;
+            casadi::Function lower_bound;
 
             casadi::Function F;
         };
@@ -41,7 +41,7 @@ namespace acro
             virtual void CreateFlags(const ProblemData &problem_data, Eigen::VectorXi &flags) const;
 
             // Generate bounds for a vector of concatinated collocation points
-            virtual void CreateBounds(const ProblemData &problem_data, Eigen::VectorXd &upper_bound, Eigen::VectorXd &lower_bound) const;
+            virtual void CreateBounds(const ProblemData &problem_data, casadi::Function &upper_bound, casadi::Function &lower_bound) const;
 
             // Generate a function to evaluate each collocation point.
             virtual void CreateFunction(const ProblemData &problem_data, casadi::Function &F) const;

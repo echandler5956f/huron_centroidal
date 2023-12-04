@@ -104,20 +104,20 @@ for k in range(N):
     # New NLP variable for the control
     Uk = ca.MX.sym('U_' + str(k))
     w.append(Uk)
-    # lbw.append([-1])
-    # ubw.append([1])
-    # w0.append([0])
-    # u_plot.append(Uk)
+    lbw.append([-1])
+    ubw.append([1])
+    w0.append([0])
+    u_plot.append(Uk)
 
     # State at collocation points
     Xc = []
     for j in range(d):
         Xkj = ca.MX.sym('X_'+str(k)+'_'+str(j), 2)
         Xc.append(Xkj)
-        # w.append(Xkj)
-        # lbw.append([-0.25, -np.inf])
-        # ubw.append([np.inf,  np.inf])
-        # w0.append([0, 0])
+        w.append(Xkj)
+        lbw.append([-0.25, -np.inf])
+        ubw.append([np.inf,  np.inf])
+        w0.append([0, 0])
 
     # Loop over collocation points
     Xk_end = D[0]*Xk
@@ -129,8 +129,8 @@ for k in range(N):
        # Append collocation equations
        fj, qj = f(Xc[j-1],Uk)
        g.append(h*fj - xp)
-    #    lbg.append([0, 0])
-    #    ubg.append([0, 0])
+       lbg.append([0, 0])
+       ubg.append([0, 0])
 
        # Add contribution to the end state
        Xk_end = Xk_end + D[j]*Xc[j-1]
@@ -140,16 +140,16 @@ for k in range(N):
 
     # New NLP variable for state at end of interval
     Xk = ca.MX.sym('X_' + str(k+1), 2)
-    # w.append(Xk)
-    # lbw.append([-0.25, -np.inf])
-    # ubw.append([np.inf,  np.inf])
-    # w0.append([0, 0])
-    # x_plot.append(Xk)
+    w.append(Xk)
+    lbw.append([-0.25, -np.inf])
+    ubw.append([np.inf,  np.inf])
+    w0.append([0, 0])
+    x_plot.append(Xk)
 
     # Add equality constraint
     g.append(Xk_end-Xk)
-    # lbg.append([0, 0])
-    # ubg.append([0, 0])
+    lbg.append([0, 0])
+    ubg.append([0, 0])
 
 # Concatenate vectors
 w = ca.vertcat(*w)
