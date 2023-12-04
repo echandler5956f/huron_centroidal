@@ -23,7 +23,7 @@ namespace acro
         {
         public:
             /*Default constructor*/
-            LagrangePolynomial();
+            LagrangePolynomial(){}
 
             /*Compute and store the coefficients for a given degree and collocation scheme*/
             void compute_matrices(int d_, const std::string &scheme = "radau");
