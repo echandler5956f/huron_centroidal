@@ -228,6 +228,16 @@ namespace acro
             g.insert(g.end(), result.begin(), result.end());
         }
 
+        casadi::SX PseudospectralSegment::get_initial_state()
+        {
+            return this->dX0_var_vec.front();
+        }
+
+        casadi::SX PseudospectralSegment::get_final_state()
+        {
+            return this->dX0_var_vec.back();
+        }
+
         void PseudospectralSegment::fill_lb(std::vector<double> &lb)
         {
             auto element_access = this->general_lb.get_elements();
@@ -238,6 +248,13 @@ namespace acro
         {
             auto element_access = this->general_ub.get_elements();
             ub.insert(ub.end(), element_access.begin(), element_access.end());
+        }
+
+        void PseudospectralSegment::fill_w(casadi::SXVector &w)
+        {
+            w.insert(w.end(), this->dXc_var_vec.begin(), this->dXc_var_vec.end());
+            w.insert(w.end(), this->dX0_var_vec.begin(), this->dX0_var_vec.end());
+            w.insert(w.end(), this->U_var_vec.begin(), this->U_var_vec.end());
         }
     }
 }

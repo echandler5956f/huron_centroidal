@@ -127,28 +127,46 @@ namespace acro
 
             /**
              * @brief Evaluate the expressions with the actual decision variables
-             * 
+             *
              * @param J0 Accumulated cost so far
              * @param g Constraint vector to fill
              */
             void evaluate_expression_graph(casadi::SX &J0, casadi::SXVector &g);
 
             /**
+             * @brief Get the initial state
+             *
+             */
+            casadi::SX get_initial_state();
+
+            /**
+             * @brief Get the final state
+             *
+             */
+            casadi::SX get_final_state();
+
+            /**
              * @brief Get lb and fill
-             * 
+             *
              * @param lb To fill
              */
             void fill_lb(std::vector<double> &lb);
 
             /**
              * @brief Get ub and fill
-             * 
+             *
              * @param ub To fill
              */
             void fill_ub(std::vector<double> &ub);
 
-        private:
+            /**
+             * @brief Get w and fill
+             *
+             * @param w To fill
+             */
+            void fill_w(casadi::SXVector &w);
 
+        private:
             /**
              * @brief Collocation state decision variables
              *
