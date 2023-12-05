@@ -133,6 +133,20 @@ namespace acro
              */
             casadi::SXVector evaluate_expression_graph(casadi::SX &J0);
 
+            /**
+             * @brief Get lb
+             * 
+             * @return std::vector<double> 
+             */
+            std::vector<double> get_lb();
+
+            /**
+             * @brief Get ub
+             * 
+             * @return std::vector<double> 
+             */
+            std::vector<double> get_ub();
+
         private:
 
             /**

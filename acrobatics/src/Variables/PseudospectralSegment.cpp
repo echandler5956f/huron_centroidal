@@ -214,8 +214,8 @@ namespace acro
             result.push_back(this->collocation_constraint_map(casadi::SXVector{horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0));
 
             result.push_back(this->xf_constraint_map(casadi::SXVector{horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0) -
-                        vertcat(casadi::SXVector(this->dX0_var_vec.begin() + 1, this->dX0_var_vec.end())));
-            
+                             vertcat(casadi::SXVector(this->dX0_var_vec.begin() + 1, this->dX0_var_vec.end())));
+
             for (auto i = 0; i < this->general_constraint_maps.size(); ++i)
             {
                 result.push_back(this->general_constraint_maps[i](casadi::SXVector{horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0));
@@ -225,6 +225,17 @@ namespace acro
             J0 = tmp;
 
             return result;
+        }
+
+        // TODO: Use pointers
+        std::vector<double> PseudospectralSegment::get_lb()
+        {
+            return this->general_lb.get_elements();
+        }
+
+        std::vector<double> PseudospectralSegment::get_ub()
+        {
+            return this->general_lb.get_elements();
         }
     }
 }
