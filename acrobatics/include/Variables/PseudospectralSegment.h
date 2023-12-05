@@ -129,23 +129,23 @@ namespace acro
              * @brief Evaluate the expressions with the actual decision variables
              * 
              * @param J0 Accumulated cost so far
-             * @return casadi::SXVector Resultant expression vector
+             * @param g Constraint vector to fill
              */
-            casadi::SXVector evaluate_expression_graph(casadi::SX &J0);
+            void evaluate_expression_graph(casadi::SX &J0, casadi::SXVector &g);
 
             /**
-             * @brief Get lb
+             * @brief Get lb and fill
              * 
-             * @return std::vector<double> 
+             * @param lb To fill
              */
-            std::vector<double> get_lb();
+            void fill_lb(std::vector<double> &lb);
 
             /**
-             * @brief Get ub
+             * @brief Get ub and fill
              * 
-             * @return std::vector<double> 
+             * @param ub To fill
              */
-            std::vector<double> get_ub();
+            void fill_ub(std::vector<double> &ub);
 
         private:
 

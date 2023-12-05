@@ -208,7 +208,7 @@ namespace acro
             }
         }
 
-        casadi::SXVector PseudospectralSegment::evaluate_expression_graph(casadi::SX &J0)
+        void PseudospectralSegment::evaluate_expression_graph(casadi::SX &J0, casadi::SXVector &g)
         {
             casadi::SXVector result;
             result.push_back(this->collocation_constraint_map(casadi::SXVector{horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0));
@@ -221,21 +221,23 @@ namespace acro
                 result.push_back(this->general_constraint_maps[i](casadi::SXVector{horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0));
             }
 
+            // Worried about aliasing here
             auto tmp = this->q_cost_fold(casadi::SXVector{J0, horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0);
             J0 = tmp;
 
-            return result;
+            g.insert(g.end(), result.begin(), result.end());
         }
 
-        // TODO: Use pointers
-        std::vector<double> PseudospectralSegment::get_lb()
+        void PseudospectralSegment::fill_lb(std::vector<double> &lb)
         {
-            return this->general_lb.get_elements();
+            auto element_access = this->general_lb.get_elements();
+            lb.insert(lb.end(), element_access.begin(), element_access.end());
         }
 
-        std::vector<double> PseudospectralSegment::get_ub()
+        void PseudospectralSegment::fill_ub(std::vector<double> &ub)
         {
-            return this->general_lb.get_elements();
+            auto element_access = this->general_ub.get_elements();
+            ub.insert(ub.end(), element_access.begin(), element_access.end());
         }
     }
 }
