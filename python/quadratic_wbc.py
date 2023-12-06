@@ -321,16 +321,16 @@ def main():
     # tuning variables
 
     # damping of the foot contact constraint
-    d_bougemarte = 2e1 
+    d_bougemarte = 2e2 
 
     # k gain of the linear momentum error
-    k_lin = 1e-2
+    k_lin = 1e0
     # k gain of the qdd base error
     k_qdd_b = 1e1
     # k gain of the qdd joint error
     k_qdd_j = 1e0
     # d gain of the qdd base error
-    d_qdd_b = 1e1
+    d_qdd_b = 1e2
     # d gain of the qdd joint error
     d_qdd_j = 1e-2
     # d gain of the linear momentum eror
@@ -381,6 +381,8 @@ def main():
         qdd_b_des = k_qdd_b * np.reshape(differ[:6], (6, 1)) + d_qdd_b * np.reshape(v0[:6] - v[:6], (6,1))
         qdd_j_des = k_qdd_j * np.reshape(q0[7:] - q[7:], (12, 1)) + d_qdd_j * np.reshape(v0[6:] - v[6:], (12, 1))
         Ldot_des = k_lin * mass * (com_ref - ccom(q)) - d_lin * mass * (vcom_ref - cvcom(q, v))
+        print(com_ref)
+        print(ccom(q))
         Hdot_des = np.zeros((3, 1))
 
         opti = ca.Opti("conic")
@@ -393,8 +395,8 @@ def main():
         objective = objective + (
             beta_body * ca.sumsqr(w_body * (qdd_b_des - var_ddq[:6]))
             + beta_joints * ca.sumsqr(w_joints * (qdd_j_des - var_ddq[6:]))
-            # + beta_angmom * ca.sumsqr(w_angmom * (Hdot_des - Hdot_fun(q, v, var_ddq)))
-            # + beta_linmom * ca.sumsqr(w_linmom * (Ldot_des - Ldot_fun(q, v, var_ddq)))
+            + beta_angmom * ca.sumsqr(w_angmom * (Hdot_des - Hdot_fun(q, v, var_ddq)))
+            + beta_linmom * ca.sumsqr(w_linmom * (Ldot_des - Ldot_fun(q, v, var_ddq)))
             + ca.sumsqr(var_tau)
             # + ca.sumsqr(var_f_left)
             # + ca.sumsqr(var_f_right)
