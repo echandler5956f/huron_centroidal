@@ -29,14 +29,13 @@ void defineRobot(model::LeggedBody &bot)
     bot.GenerateContactCombination();
 }
 
-int main(int argc, char **argv)
+int main()
 {
     model::LeggedBody bot;
     std::cout << "Starting" << std::endl;
     defineRobot(bot);
 
     std::cout << "defineRobot" << std::endl;
-
 
     //Create environment Surfaces
     std::shared_ptr<environment::EnvironmentSurfaces> surfaces;

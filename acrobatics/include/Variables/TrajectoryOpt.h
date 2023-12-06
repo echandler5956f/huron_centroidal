@@ -20,7 +20,6 @@ namespace acro
              */
             TrajectoryOpt();
 
-        private:
             /**
              * @brief Initialize the finite elements
              *
@@ -29,6 +28,14 @@ namespace acro
              */
             void init_finite_elements(contact::ContactSequence contacts, int d);
 
+            /**
+             * @brief Optimize and return the solution
+             * 
+             * @return casadi::DMDict 
+             */
+            casadi::DMDict optimize();
+
+        private:
             /**
              * @brief A Trajectory is made up of pseudospectral finite elements
              *
@@ -84,6 +91,43 @@ namespace acro
              *
              */
             double T;
+
+            /**
+             * @brief Vector of all decision variables
+             * 
+             */
+            casadi::SXVector w;
+
+            /**
+             * @brief Vector of all constraint expressions
+             * 
+             */
+            casadi::SXVector g;
+
+            /**
+             * @brief Vector of all constraint lower bounds
+             * 
+             */
+            std::vector<double> lb;
+
+
+            /**
+             * @brief Vector of all constraint upper bounds
+             * 
+             */
+            std::vector<double> ub;
+
+            /**
+             * @brief Expression for objective cost
+             * 
+             */
+            casadi::SX J;
+
+            /**
+             * @brief Vector of all times where decision variables are evaluated
+             * 
+             */
+            std::vector<double> all_times;
         };
     }
 }

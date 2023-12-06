@@ -9,7 +9,7 @@ namespace acro
             assert((d_ > 0) && (d_ < 10) && "Collocation degrees must be positive and no greater than 9");
             this->d = d_;
             /*Choose collocation points*/
-            auto troot = casadi::collocation_points(this->d, scheme);
+            std::vector<double> troot = casadi::collocation_points(this->d, scheme);
             troot.insert(troot.begin(), 0);
             this->tau_root = Eigen::Map<Eigen::VectorXd>(troot.data(), troot.size());
 
@@ -23,11 +23,11 @@ namespace acro
             this->D.resize(this->d + 1);
 
             /*For all collocation points*/
-            for (auto j = 0; j < this->d + 1; ++j)
+            for (int j = 0; j < this->d + 1; ++j)
             {
                 /*Construct Lagrange polynomials to get the polynomial basis at the collocation point*/
                 casadi::Polynomial p = 1;
-                for (auto r = 0; r < this->d + 1; ++r)
+                for (int r = 0; r < this->d + 1; ++r)
                 {
                     if (r != j)
                     {
@@ -39,11 +39,11 @@ namespace acro
 
                 /*Evaluate the time derivative of the polynomial at all collocation points to get the coefficients of the continuity equation*/
                 casadi::Polynomial dp = p.derivative();
-                for (auto r = 0; r < this->d + 1; ++r)
+                for (int r = 0; r < this->d + 1; ++r)
                 {
                     this->C(j, r) = dp(this->tau_root(r));
                 }
-                auto pint = p.anti_derivative();
+                casadi::Polynomial pint = p.anti_derivative();
                 this->B(j) = pint(1.0);
             }
         }
@@ -52,10 +52,10 @@ namespace acro
         {
             assert((t >= 0.0) && (t <= 1.0) && "t must be in the range [0,1]");
             casadi::SX result = 0;
-            for (auto j = 0; j < this->d + 1; ++j)
+            for (int j = 0; j < this->d + 1; ++j)
             {
                 casadi::SX term = terms[j];
-                for (auto r = 0; r < this->d + 1; ++r)
+                for (int r = 0; r < this->d + 1; ++r)
                 {
                     if (r != j)
                     {
@@ -87,7 +87,7 @@ namespace acro
             this->dX_poly = LagrangePolynomial(d);
             this->U_poly = LagrangePolynomial(d - 1);
 
-            for (auto j = 0; j < d; ++j)
+            for (int j = 0; j < d; ++j)
             {
                 this->dXc.push_back(casadi::SX::sym("dXc_" + std::to_string(j), this->st_m->ndx, 1));
                 if (j < d - 1)
@@ -103,13 +103,19 @@ namespace acro
         {
             this->times = casadi::DM::zeros(this->knot_num * (this->dX_poly.d + 1) + 1, 1);
             this->times(this->knot_num * (this->dX_poly.d + 1)) = this->T;
-            for (auto k = 0; k < this->knot_num; ++k)
+            for (int k = 0; k < this->knot_num; ++k)
             {
-                for (auto j = 0; j < this->dX_poly.d + 1; ++j)
+                for (int j = 0; j < this->dX_poly.d + 1; ++j)
                 {
                     this->times(k * (this->dX_poly.d + 1) + j) = this->dX_poly.tau_root[j] * this->h + k * this->h;
                 }
             }
+        }
+
+        void PseudospectralSegment::fill_times(std::vector<double> &all_times)
+        {
+            std::vector<double> element_access1 = this->times.get_elements();
+            all_times.insert(all_times.end(), element_access1.begin(), element_access1.end());
         }
 
         void PseudospectralSegment::initialize_knot_segments()
@@ -117,13 +123,13 @@ namespace acro
             this->dXc_var_vec.clear();
             this->U_var_vec.clear();
             this->dX0_var_vec.clear();
-            for (auto k = 0; k < this->knot_num; ++k)
+            for (int k = 0; k < this->knot_num; ++k)
             {
-                for (auto j = 0; j < this->dX_poly.d; ++j)
+                for (int j = 0; j < this->dX_poly.d; ++j)
                 {
                     this->dXc_var_vec.push_back(casadi::SX::sym("dXc_" + std::to_string(k) + "_" + std::to_string(j), this->st_m->ndx, 1));
                 }
-                for (auto j = 0; j < this->U_poly.d; ++j)
+                for (int j = 0; j < this->U_poly.d; ++j)
                 {
                     this->U_var_vec.push_back(casadi::SX::sym("U_" + std::to_string(k) + "_" + std::to_string(j), this->st_m->nu, 1));
                 }
@@ -142,16 +148,16 @@ namespace acro
             /*U interpolated at the dx polynomial collocation points*/
             casadi::SXVector u_at_c;
 
-            for (auto j = 1; j < this->dX_poly.d + 1; ++j)
+            for (int j = 1; j < this->dX_poly.d + 1; ++j)
             {
                 double dt_j = this->dX_poly.tau_root(j) - this->dX_poly.tau_root(j - 1) * this->h;
                 /*Expression for the state derivative at the collocation point*/
                 casadi::SX dxp = this->dX_poly.C(0, j) * this->dX0;
-                for (auto r = 0; r < this->dX_poly.d; ++r)
+                for (int r = 0; r < this->dX_poly.d; ++r)
                 {
                     dxp += this->dX_poly.C(r + 1, j) * this->dXc[r];
                 }
-
+                /*dXc must exist in a Euclidean space, but we need x_c in order to evaluate the objective. Fint can simply return dXc[j-1] if the states are already Euclidean*/
                 casadi::SX x_c = this->Fint(casadi::SXVector{this->dX0, this->dXc[j - 1], dt_j}).at(0);
                 casadi::SX u_c = this->U_poly.lagrange_interpolation(this->dX_poly.tau_root(j - 1), this->Uc);
                 u_at_c.push_back(u_c);
@@ -192,7 +198,7 @@ namespace acro
             casadi::SXVector tmp_dx = this->dXc;
             tmp_dx.push_back(this->dX0); /*If we are doing this for state, is the size right for U?*/
 
-            for (auto i = 0; i < G.size(); ++i)
+            for (int i = 0; i < G.size(); ++i)
             {
                 auto g_data = G[i];
                 casadi::SXVector tmp_map = g_data->F.map(this->dX_poly.d, "serial")(casadi::SXVector{vertcat(tmp_dx), vertcat(u_at_c)});
@@ -216,16 +222,23 @@ namespace acro
             result.push_back(this->xf_constraint_map(casadi::SXVector{horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0) -
                              vertcat(casadi::SXVector(this->dX0_var_vec.begin() + 1, this->dX0_var_vec.end())));
 
-            for (auto i = 0; i < this->general_constraint_maps.size(); ++i)
+            for (std::size_t i = 0; i < this->general_constraint_maps.size(); ++i)
             {
                 result.push_back(this->general_constraint_maps[i](casadi::SXVector{horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0));
             }
 
             // Worried about aliasing here
-            auto tmp = this->q_cost_fold(casadi::SXVector{J0, horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0);
-            J0 = tmp;
-
+            casadi::SX cost = this->q_cost_fold(casadi::SXVector{J0, horzcat(this->dXc_var_vec), horzcat(this->dX0_var_vec), horzcat(this->U_var_vec)}).at(0);
+            J0 = cost;
+            /*where g of this segment starts*/
+            auto tmp_it = g.end() + 1;
             g.insert(g.end(), result.begin(), result.end());
+            this->g_range = tuple_size_t(tmp_it - g.begin(), g.end() - g.begin());
+        }
+
+        tuple_size_t PseudospectralSegment::get_range_idx_constraint_expressions()
+        {
+            return this->g_range;
         }
 
         casadi::SX PseudospectralSegment::get_initial_state()
@@ -238,23 +251,37 @@ namespace acro
             return this->dX0_var_vec.back();
         }
 
-        void PseudospectralSegment::fill_lb(std::vector<double> &lb)
+        void PseudospectralSegment::fill_lb_ub(std::vector<double> &lb, std::vector<double> &ub)
         {
-            auto element_access = this->general_lb.get_elements();
-            lb.insert(lb.end(), element_access.begin(), element_access.end());
+            /*where lb/ub of this segment starts*/
+            auto tmp_it = lb.end() + 1;
+            std::vector<double> element_access1 = this->general_lb.get_elements();
+            std::vector<double> element_access2 = this->general_ub.get_elements();
+
+            lb.insert(lb.end(), element_access1.begin(), element_access1.end());
+            ub.insert(ub.end(), element_access2.begin(), element_access2.end());
+            this->lb_ub_range = tuple_size_t(tmp_it - lb.begin(), lb.end() - lb.begin());
         }
 
-        void PseudospectralSegment::fill_ub(std::vector<double> &ub)
+        tuple_size_t PseudospectralSegment::get_range_idx_bounds()
         {
-            auto element_access = this->general_ub.get_elements();
-            ub.insert(ub.end(), element_access.begin(), element_access.end());
+            return this->lb_ub_range;
         }
 
         void PseudospectralSegment::fill_w(casadi::SXVector &w)
         {
+            /*where w of this segment starts*/
+            auto tmp_it = w.end() + 1;
             w.insert(w.end(), this->dXc_var_vec.begin(), this->dXc_var_vec.end());
             w.insert(w.end(), this->dX0_var_vec.begin(), this->dX0_var_vec.end());
             w.insert(w.end(), this->U_var_vec.begin(), this->U_var_vec.end());
+            this->w_range = tuple_size_t(tmp_it - w.begin(), w.end() - w.begin());
         }
+
+        tuple_size_t PseudospectralSegment::get_range_idx_decision_variables()
+        {
+            return this->w_range;
+        }
+
     }
 }

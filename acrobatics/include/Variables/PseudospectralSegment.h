@@ -12,6 +12,8 @@ namespace acro
     namespace variables
     {
 
+        using tuple_size_t = std::tuple<std::size_t, std::size_t>;
+
         /**
          * @brief Helper class for storing polynomial information
          *
@@ -111,6 +113,13 @@ namespace acro
             void initialize_time_vector();
 
             /**
+             * @brief Fill all times with the time vector from this segment
+             * 
+             * @param all_times 
+             */
+            void fill_times(std::vector<double> &all_times);
+
+            /**
              * @brief Create all the knot segments
              *
              */
@@ -146,18 +155,12 @@ namespace acro
             casadi::SX get_final_state();
 
             /**
-             * @brief Get lb and fill
+             * @brief Get lb/ub and fill
              *
              * @param lb To fill
-             */
-            void fill_lb(std::vector<double> &lb);
-
-            /**
-             * @brief Get ub and fill
-             *
              * @param ub To fill
              */
-            void fill_ub(std::vector<double> &ub);
+            void fill_lb_ub(std::vector<double> &lb, std::vector<double> &ub);
 
             /**
              * @brief Get w and fill
@@ -165,6 +168,27 @@ namespace acro
              * @param w To fill
              */
             void fill_w(casadi::SXVector &w);
+
+            /**
+             * @brief Returns the starting and ending index in w (call after fill_w!)
+             * 
+             * @return tuple_size_t 
+             */
+            tuple_size_t get_range_idx_decision_variables();
+
+            /**
+             * @brief Returns the starting and ending index in g (call after evaluate_expression_graph!)
+             * 
+             * @return tuple_size_t
+             */
+            tuple_size_t get_range_idx_constraint_expressions();
+
+            /**
+             * @brief Returns the starting and ending index in g (call after fill_lb_ub!). This should match get_range_idx_constraint_expressions
+             * 
+             * @return tuple_size_t 
+             */
+            tuple_size_t get_range_idx_bounds();
 
         private:
             /**
@@ -296,6 +320,24 @@ namespace acro
              *
              */
             double T;
+
+            /**
+             * @brief Starting and ending index of the decision variables in w corresponding to this segment
+             * 
+             */
+            tuple_size_t w_range;
+
+            /**
+             * @brief Starting and ending index of the constraint expressions in g corresponding to this segment. This should match lb_ub_range
+             * 
+             */
+            tuple_size_t g_range;
+
+            /**
+             * @brief Starting and ending index of the bounds in lb/ub corresponding to this segment. This should match g_range
+             * 
+             */
+            tuple_size_t lb_ub_range;
         };
     }
 }
