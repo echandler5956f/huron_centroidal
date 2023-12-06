@@ -189,6 +189,32 @@ namespace acro
             }
 
             /**
+             * @brief Get f: floor(nu/2) x 1
+             *
+             * @tparam Sym
+             * @param u
+             * @return const Sym
+             */
+            template <class Sym>
+            const Sym get_f(const Sym &u)
+            {
+                return u(casadi::Slice(0, 3));
+            }
+
+            /**
+             * @brief Get tau: floor(nu/2) x 1
+             *
+             * @tparam Sym
+             * @param u
+             * @return const Sym
+             */
+            template <class Sym>
+            const Sym get_tau(const Sym &u)
+            {
+                return u(casadi::Slice(3, this->nu));
+            }
+
+            /**
              * @brief Number of position variables
              *
              */
@@ -211,6 +237,12 @@ namespace acro
              *
              */
             int ndx;
+
+            /**
+             * @brief Number of joint velocity inputs
+             * 
+             */
+            int nvju;
         };
     }
 }

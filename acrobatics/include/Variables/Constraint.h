@@ -10,6 +10,13 @@ namespace acro
 
         struct ProblemData
         {
+            ProblemData(casadi::Function Fint_, casadi::Function F_, casadi::Function L_, casadi::Function Phi_)
+            {
+                this->Fint = Fint_;
+                this->F = F_;
+                this->L = L_;
+                this->Phi = Phi_;
+            }
             casadi::Function Fint;
             casadi::Function F;
             casadi::Function L;

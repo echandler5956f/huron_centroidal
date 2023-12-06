@@ -16,7 +16,10 @@ namespace acro
         public:
             /**
              * @brief Construct a new Trajectory Opt object
-             *
+             * 
+             * @param opts_ Options to pass to the solver
+             * @param state_indices_ Helper class to get the state indices
+             * @param problem Problem data containing the objective function and dynamics
              */
             TrajectoryOpt(casadi::Dict opts_, States *state_indices_, ProblemData *problem);
 
