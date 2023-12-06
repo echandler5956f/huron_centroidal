@@ -42,7 +42,7 @@ void acro::model::LeggedBody::GenerateContactCombination()
     for (uint binary_value_combination = 0; binary_value_combination < num_combinations; binary_value_combination++)
     {
         // Copy the no contact cc
-       contact::ContactCombination new_contact_combination = basic_cc;
+        contact::ContactCombination new_contact_combination = basic_cc;
         // And set the value for each ee in contact to true
         uint mask = 1;
 

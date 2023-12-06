@@ -8,16 +8,18 @@ namespace acro
     namespace variables
     {
 
-        // The actual implementation is on another branch
         struct ProblemData
         {
+            casadi::Function Fint;
+            casadi::Function F;
+            casadi::Function L;
+            casadi::Function Phi;
         };
 
         struct ConstraintData
         {
             Eigen::VectorXi flags;
 
-            // Shoud this be one vector of upper & lower bound, or a casadi function of time to map
             casadi::Function upper_bound;
             casadi::Function lower_bound;
 

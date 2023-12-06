@@ -32,11 +32,10 @@ namespace acro
                     return;
                 }
 
-                if(i < combination_definition.size() - 1)
+                if (i < combination_definition.size() - 1)
                     it++;
             }
         }
-
 
         int ContactSequence::addPhase(const ContactMode &mode, int knot_points, double dt)
         {
@@ -45,7 +44,8 @@ namespace acro
             new_phase.mode = mode;
             ContactMode::ContactModeValidity validity;
             new_phase.mode.MakeValid(validity);
-            if(validity != ContactMode::ContactModeValidity::VALID){
+            if (validity != ContactMode::ContactModeValidity::VALID)
+            {
                 return -1;
             }
             new_phase.knot_points = knot_points;
@@ -78,7 +78,7 @@ namespace acro
             }
         }
 
-        int ContactSequence::getPhaseIndexAtKnot(int knot_idx, CONTACT_SEQUENCE_ERROR &error_status) const 
+        int ContactSequence::getPhaseIndexAtKnot(int knot_idx, CONTACT_SEQUENCE_ERROR &error_status) const
         {
             if ((knot_idx < 0) || (knot_idx >= total_knots_))
             {
@@ -97,7 +97,7 @@ namespace acro
             }
         }
 
-        void ContactSequence::getPhaseAtTime(double t, Phase &phase, CONTACT_SEQUENCE_ERROR &error_status) const 
+        void ContactSequence::getPhaseAtTime(double t, Phase &phase, CONTACT_SEQUENCE_ERROR &error_status) const
         {
             int phase_index = getPhaseIndexAtTime(t, error_status);
             if (error_status != CONTACT_SEQUENCE_ERROR::OK)

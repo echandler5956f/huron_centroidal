@@ -4,8 +4,15 @@ namespace acro
 {
     namespace variables
     {
-        TrajectoryOpt::TrajectoryOpt()
+        TrajectoryOpt::TrajectoryOpt(casadi::Dict opts_, States *state_indices_, ProblemData *problem)
         {
+            this->opts = opts_;
+            this->state_indices = state_indices_;
+
+            this->Fint = problem->Fint;
+            this->F = problem->F;
+            this->L = problem->L;
+            this->Phi = problem->Phi;
         }
 
         void TrajectoryOpt::init_finite_elements(contact::ContactSequence contacts, int d)
@@ -21,11 +28,11 @@ namespace acro
             casadi::SX prev_final_state;
             casadi::SX curr_initial_state;
 
-            std::vector<double> equality_back(this->state_indices.ndx, 0.0);
+            std::vector<double> equality_back(this->state_indices->ndx, 0.0);
             std::size_t i = 0;
             for (auto phase : contacts.phase_sequence_)
             {
-                auto ps = PseudospectralSegment(d, phase.knot_points, phase.time_value, &this->state_indices, this->Fint);
+                auto ps = PseudospectralSegment(d, phase.knot_points, phase.time_value, this->state_indices, this->Fint);
                 /*TODO: Fill with user defined functions, and handle global/phase-dependent/time-varying constraints*/
                 std::vector<std::shared_ptr<ConstraintData>> G;
                 ps.initialize_expression_graph(this->F, this->L, G);

@@ -18,7 +18,7 @@ namespace acro
              * @brief Construct a new Trajectory Opt object
              *
              */
-            TrajectoryOpt();
+            TrajectoryOpt(casadi::Dict opts_, States *state_indices_, ProblemData *problem);
 
             /**
              * @brief Initialize the finite elements
@@ -84,7 +84,7 @@ namespace acro
              * @brief Slicer to get the states
              *
              */
-            States state_indices;
+            States *state_indices;
 
             /**
              * @brief Fixed time horizon of the entire trajectory

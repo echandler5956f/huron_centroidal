@@ -5,23 +5,24 @@ namespace acro
     namespace environment
     {
 
-        SurfaceData CreateInfiniteGround(){
-            SurfaceData infinite_ground; 
+        SurfaceData CreateInfiniteGround()
+        {
+            SurfaceData infinite_ground;
             infinite_ground.origin_z_offset = 0;
             infinite_ground.A = {0, 0};
 
             infinite_ground.b = Eigen::VectorXd::Zero(1);
-            infinite_ground.polytope_local_chebyshev_center = {0,0};
+            infinite_ground.polytope_local_chebyshev_center = {0, 0};
             return infinite_ground;
         }
 
         template <class T>
-        void PointViolation(const SurfaceData &region, const Eigen::Matrix<T,2,1> &point, Eigen::Matrix<T,Eigen::Dynamic,1> &ineq_violation)
+        void PointViolation(const SurfaceData &region, const Eigen::Matrix<T, 2, 1> &point, Eigen::Matrix<T, Eigen::Dynamic, 1> &ineq_violation)
         {
             ineq_violation = region.A * point - region.b;
         }
         template <class T>
-        void PointViolation(const SurfaceData &region, const Eigen::Matrix<T,3,1> &point, Eigen::Matrix<T,Eigen::Dynamic,1> &ineq_violation, Eigen::Matrix<T,1,1> &eq_violation)
+        void PointViolation(const SurfaceData &region, const Eigen::Matrix<T, 3, 1> &point, Eigen::Matrix<T, Eigen::Dynamic, 1> &ineq_violation, Eigen::Matrix<T, 1, 1> &eq_violation)
         {
             ineq_violation = region.A * point.head(2) - region.b;
             eq_violation[0] = point.tail(1)[0] - region.origin_z_offset;
@@ -37,7 +38,7 @@ namespace acro
         bool isOnRegion(const SurfaceData &region, const Eigen::Vector3d &point)
         {
             Eigen::VectorXd ineq_violation;
-            Eigen::Matrix<double,1,1> eq_violation;
+            Eigen::Matrix<double, 1, 1> eq_violation;
             PointViolation(region, point, ineq_violation, eq_violation);
             bool ineq_satisfied = (ineq_violation.array() <= Eigen::VectorXd::Zero(ineq_violation.size()).array()).all();
             bool eq_satisfied = (eq_violation[0] <= 1e-6) && (eq_violation[0] >= -1e-6);

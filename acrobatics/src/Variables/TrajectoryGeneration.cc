@@ -1,14 +1,14 @@
 #include "Variables/TrajectoryGeneration.h"
 
-
-namespace acro{
-namespace variables
+namespace acro
 {
-
-    template <class Sym>
-    bool ProblemSetup<Sym>::CheckValidity()
+    namespace variables
     {
-        return contact_sequence.getPhaseAtKnot(0).mode == init_condition.init_mode;
+
+        template <class Sym>
+        bool ProblemSetup<Sym>::CheckValidity()
+        {
+            return contact_sequence->getPhaseAtKnot(0).mode == init_condition.init_mode;
+        }
     }
-}
 }

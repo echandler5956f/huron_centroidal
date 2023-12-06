@@ -70,17 +70,17 @@ int main()
 
     
     // A contact sequence has timing and knot metadata
-    contact::ContactSequence contact_sequence(num_ees);
-    contact_sequence.addPhase(initial_mode, 100, 0.2);
-    contact_sequence.addPhase(intermediate_mode, 100, 0.5);
-    contact_sequence.addPhase(final_mode, 100, 0.3);
+    contact::ContactSequence *contact_sequence = new contact::ContactSequence(num_ees);
+    contact_sequence->addPhase(initial_mode, 100, 0.2);
+    contact_sequence->addPhase(intermediate_mode, 100, 0.5);
+    contact_sequence->addPhase(final_mode, 100, 0.3);
 
     std::cout << "Here6" << std::endl;
 
 
     variables::Target<> target(target_state_vector, state_definition);
     variables::InitialCondition<> initial_condition(initial_state_vector, state_definition, initial_mode);
-    variables::ProblemSetup<> problem_setup(initial_condition, contact_sequence);
+    // variables::ProblemSetup<> problem_setup(initial_condition, contact_sequence);
 
     std::cout << "Here7" << std::endl;
     return -1;

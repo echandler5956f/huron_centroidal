@@ -1,50 +1,54 @@
 #include "States.h"
+#include "Model/ContactSequence.h"
 
-namespace acro{
-namespace variables
+namespace acro
 {
-    template <class Sym = Eigen::VectorXd>
-    struct Target
+    namespace variables
     {
-        Target(Sym set_target_vars, States set_state_def) : target_vars(set_target_vars), state_def(set_state_def)
+        template <class Sym = Eigen::VectorXd>
+        struct Target
         {
-            int size_of_state = state_def.ndh + state_def.nq + state_def.nvb + state_def.nx;
-            Q = Eigen::MatrixXd::Identity(size_of_state, size_of_state);
-        }
+            Target(Sym target_vars_, States state_def_)
+            {
+                this->target_vars = target_vars_;
+                this->state_def = state_def_;
+                Q = Eigen::MatrixXd::Identity(this->state_def.ndx, this->state_def.ndx);
+            }
 
-        Sym target_vars;
-        States state_def;
-        // Cost matrix
-        Eigen::MatrixXd Q;
-    };
+            Sym target_vars;
+            States state_def;
+            // Cost matrix
+            Eigen::MatrixXd Q;
+        };
 
-    template <class Sym = Eigen::VectorXd>
-    struct InitialCondition
-    {
+        template <class Sym = Eigen::VectorXd>
+        struct InitialCondition
+        {
+            InitialCondition(Sym x0_vars_, States state_def_, contact::ContactMode initial_contacts_)
+            {
+                this->x0_vars = x0_vars_;
+                this->state_def = state_def_;
+                this->initial_contacts = initial_contacts_;
+            }
 
-        InitialCondition(Sym set_x0_vars,
-                         States set_state_def,
-                         contact::ContactMode set_init_mode) : x0_vars(set_x0_vars),
-                                                               state_def(set_state_def), init_mode(set_init_mode) {}
+            Sym x0_vars;
+            States state_def;
+            contact::ContactMode initial_contacts;
+        };
 
-        Sym x0_vars;
-        States state_def;
-        contact::ContactMode init_mode;
-    };
+        template <class Sym = Eigen::VectorXd>
+        struct ProblemSetup
+        {
+            ProblemSetup(InitialCondition<Sym> initial_condition_, contact::ContactSequence *contact_sequence_)
+            {
+                this->initial_condition = initial_condition_;
+                this->contact_sequence = contact_sequence_;
+            }
 
-    template <class Sym = Eigen::VectorXd>
-    struct ProblemSetup
-    {
-        //
-        ProblemSetup(InitialCondition<Sym> set_init_condition,
-                     contact::ContactSequence set_contact_sequence) : init_condition(set_init_condition),
-                                                                      contact_sequence(set_contact_sequence) {}
-        //
+            bool CheckValidity();
 
-        bool CheckValidity();
-
-        InitialCondition<Sym> init_condition;
-        contact::ContactSequence contact_sequence;
-    };
-}
+            InitialCondition<Sym> initial_condition;
+            contact::ContactSequence *contact_sequence;
+        };
+    }
 }

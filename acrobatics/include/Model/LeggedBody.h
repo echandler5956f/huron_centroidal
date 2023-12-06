@@ -20,9 +20,9 @@ namespace acro
             void GenerateContactCombination();
 
             // ContactCombination getContactCombination(const std::string&);
-            
+
             // Referenced by binary value instead
-            contact::ContactCombination getContactCombination(int contact_mask){return contact_combinations_[contact_mask];}
+            contact::ContactCombination getContactCombination(int contact_mask) { return contact_combinations_[contact_mask]; }
 
         private:
             std::vector<std::string> ee_names_;
