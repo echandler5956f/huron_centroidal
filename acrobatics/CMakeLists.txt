@@ -18,4 +18,6 @@ target_link_libraries(biqu-acrobatics casadi pinocchio Eigen3::Eigen)
 # target_link_libraries(test biqu-acrobatics)
 
 add_executable(traj_test test/traj_test.cpp)
+add_executable(test test/test.cpp)
 target_link_libraries(traj_test biqu-acrobatics)
+target_link_libraries(test biqu-acrobatics)

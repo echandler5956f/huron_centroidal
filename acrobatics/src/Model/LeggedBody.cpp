@@ -24,6 +24,8 @@ void acro::model::LeggedBody::setEndEffectors(const std::vector<std::string> &ee
 
         ees_.insert({ee_name, ee_obj_ptr});
     }
+    num_end_effectors_ = ee_names.size();
+    ee_names_ = ee_names;
 }
 
 // Generate combinations of contacts.
@@ -38,18 +40,21 @@ void acro::model::LeggedBody::GenerateContactCombination()
     // The power set can be gotten by all the binary values between 0 and 2^n-1.
     // That is, 0000, 0001, 0010, 0011, ... for 4 EEs.
     int num_combinations = pow(2, num_end_effectors_);
+
     contact_combinations.resize(num_combinations);
     for (uint binary_value_combination = 0; binary_value_combination < num_combinations; binary_value_combination++)
     {
         // Copy the no contact cc
         contact::ContactCombination new_contact_combination = basic_cc;
         // And set the value for each ee in contact to true
-        uint mask = 1;
+        std::bitset<32> bit_mask = 1;
+        std::bitset<32> binary_value_combination_bits = binary_value_combination;
 
-        for (int i = 0; i < num_end_effectors_; ++i)
+        for (int i = 0; i < num_end_effectors_; i++)
         {
-            bool ee_i_is_in_contact = (mask & binary_value_combination);
-            mask *= 2;
+            bool ee_i_is_in_contact = (bit_mask & binary_value_combination_bits).any();
+            //bit shift
+            bit_mask<<=1;
             new_contact_combination[ee_names_[i]] = ee_i_is_in_contact;
         }
         contact_combinations[binary_value_combination] = new_contact_combination;
