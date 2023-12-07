@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Degree of interpolating polynomial
-d = 2
+d = 3
 
 # Get collocation points
 tau_root = np.append(0, ca.collocation_points(d, 'radau'))
@@ -56,7 +56,7 @@ L = x1**2 + x2**2 + u**2
 f = ca.Function('f', [x, u], [xdot, L], ['x', 'p'], ['ode', 'quad'])
 
 # Control discretization
-N = 2 # number of control intervals
+N = 20 # number of control intervals
 h = T/N
 
 # Variables for a single collocation interval
@@ -139,27 +139,27 @@ sol = opti.solve()
 x_opt = np.transpose(np.array([opti.value(var_x) for var_x in var_xs]))
 u_opt = np.transpose(np.array([opti.value(var_u) for var_u in var_us]))
 
-# # Plot the result
-# tgrid = np.linspace(0, T, N+1)
-# plt.figure(1)
-# plt.clf()
-# plt.plot(tgrid, x_opt[0, :], '--')
-# plt.plot(tgrid, x_opt[1, :], '-')
-# plt.step(tgrid, np.append(np.nan, u_opt), '-.')
-# plt.xlabel('t')
-# plt.legend(['x1','x2','u'])
-# plt.grid()
-# plt.show()
+# Plot the result
+tgrid = np.linspace(0, T, N+1)
+plt.figure(1)
+plt.clf()
+plt.plot(tgrid, x_opt[0, :], '--')
+plt.plot(tgrid, x_opt[1, :], '-')
+plt.step(tgrid, np.append(np.nan, u_opt), '-.')
+plt.xlabel('t')
+plt.legend(['x1','x2','u'])
+plt.grid()
+plt.show()
 
-# # Create a s
-# ll times: [ 0.          1.05662433  3.94337567  5.          6.05662433  8.94337567
-#  10.        ]
-# 7
-all_times = np.zeros((N * (d+1) + 1,1))
-all_times[N * (d+1)] = 10
-for k in range(N):
-    for j in range(d + 1):
-        col_time = tau_root[j] * h + k * h
-        all_times[k * (d + 1) + j] = col_time
-print("All times:", all_times)
-print(all_times.size)
+# # # Create a s
+# # ll times: [ 0.          1.05662433  3.94337567  5.          6.05662433  8.94337567
+# #  10.        ]
+# # 7
+# all_times = np.zeros((N * (d+1) + 1,1))
+# all_times[N * (d+1)] = 10
+# for k in range(N):
+#     for j in range(d + 1):
+#         col_time = tau_root[j] * h + k * h
+#         all_times[k * (d + 1) + j] = col_time
+# print("All times:", all_times)
+# print(all_times.size)

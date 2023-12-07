@@ -178,9 +178,7 @@ namespace acro
 
                 dXf += this->dX_poly.D(j) * this->dXc[j - 1];
             }
-            long N = this->knot_num * (2 + G.size());
-            this->general_lb.resize(N, 1);
-            this->general_ub.resize(N, 1);
+
             /*Implicit discrete-time equations*/
             this->collocation_constraint_map = Function("feq",
                                                         SXVector{this->X0, vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
@@ -191,9 +189,6 @@ namespace acro
                                                SXVector{this->X0, vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
                                                SXVector{dXf})
                                           .map(this->knot_num, "openmp");
-
-            this->general_lb(Slice(0, this->knot_num * 2)) = DM::zeros(this->knot_num * 2, 1);
-            this->general_ub(Slice(0, this->knot_num * 2)) = DM::zeros(this->knot_num * 2, 1);
 
             this->q_cost_fold = Function("fxq",
                                          SXVector{this->Lc, this->X0, vertcat(this->dXc), this->dX0, vertcat(this->Uc)},
@@ -206,18 +201,33 @@ namespace acro
             SXVector tmp_x = x_at_c;
             tmp_x.push_back(this->X0); /*If we are doing this for state, is the size right for U?*/
 
+            long N = this->collocation_constraint_map.size1_out(0) * this->collocation_constraint_map.size2_out(0) +
+                     this->xf_constraint_map.size1_out(0) * this->xf_constraint_map.size2_out(0);
+            auto tmp = N;
+            std::vector<tuple_size_t> ranges;
             for (int i = 0; i < G.size(); ++i)
             {
                 auto g_data = G[i];
                 SXVector tmp_map = g_data->F.map(this->dX_poly.d, "serial")(SXVector{vertcat(tmp_x), vertcat(u_at_c)});
-                this->general_constraint_maps.push_back(Function("fg",
-                                                                 SXVector{this->X0, vertcat(tmp_dx), vertcat(this->Uc)},
-                                                                 SXVector{vertcat(tmp_map)})
-                                                            .map(this->knot_num, "openmp"));
+                auto tmap = Function("fg",
+                                     SXVector{this->X0, vertcat(tmp_dx), vertcat(this->Uc)},
+                                     SXVector{vertcat(tmp_map)});
+                this->general_constraint_maps.push_back(tmap);
+                ranges.push_back(tuple_size_t(N, N + tmap.size1_out(0) * tmap.size2_out(0)));
+                N += tmap.size1_out(0) * tmap.size2_out(0);
+            }
 
-                this->general_lb(Slice(this->knot_num * (i + 2), this->knot_num * (i + 1 + 2))) =
+            this->general_lb.resize(N, 1);
+            this->general_ub.resize(N, 1);
+            this->general_lb(Slice(0, casadi_int(tmp))) = DM::zeros(tmp, 1);
+            this->general_ub(Slice(0, casadi_int(tmp))) = DM::zeros(tmp, 1);
+
+            for (int i = 0; i < G.size(); ++i)
+            {
+                auto g_data = G[i];
+                this->general_lb(Slice(casadi_int(std::get<0>(ranges[i])), casadi_int(std::get<1>(ranges[i])))) =
                     vertcat(g_data->lower_bound.map(this->knot_num, "serial")(this->times));
-                this->general_ub(Slice(this->knot_num * (i + 2), this->knot_num * (i + 1 + 2))) =
+                this->general_ub(Slice(casadi_int(std::get<0>(ranges[i])), casadi_int(std::get<1>(ranges[i])))) =
                     vertcat(g_data->upper_bound.map(this->knot_num, "serial")(this->times));
             }
         }
@@ -240,14 +250,18 @@ namespace acro
                 dxcs = horzcat(dxcs, this->dXc_var_vec[k]);
                 us = horzcat(us, this->U_var_vec[k]);
             }
-            result.push_back(this->collocation_constraint_map(SXVector{xs, dxcs, dxs, us}).at(0));
+            auto col_con_mat = this->collocation_constraint_map(SXVector{xs, dxcs, dxs, us}).at(0);
+            auto xf_con_mat = this->xf_constraint_map(SXVector{xs, dxcs, dxs, us}).at(0);
+            dxs_offset = reshape(dxs_offset, dxs_offset.size1() * dxs_offset.size2(), 1);
 
-            result.push_back(this->xf_constraint_map(SXVector{xs, dxcs, dxs, us}).at(0) -
+            result.push_back(reshape(col_con_mat, col_con_mat.size1() * col_con_mat.size2(), 1));
+            result.push_back(reshape(xf_con_mat, xf_con_mat.size1() * xf_con_mat.size2(), 1) -
                              dxs_offset);
 
             for (std::size_t i = 0; i < this->general_constraint_maps.size(); ++i)
             {
-                result.push_back(this->general_constraint_maps[i](SXVector{xs, dxcs, dxs, us}).at(0));
+                auto g_con_mat = this->general_constraint_maps[i](SXVector{xs, dxcs, dxs, us}).at(0);
+                result.push_back(reshape(g_con_mat, g_con_mat.size1() * g_con_mat.size2(), 1));
             }
 
             // Worried about aliasing here
@@ -267,6 +281,11 @@ namespace acro
         SX PseudospectralSegment::get_initial_state_deviant()
         {
             return this->dX0_var_vec.front();
+        }
+
+        SX PseudospectralSegment::get_initial_state()
+        {
+            return this->X0_var_vec.front();
         }
 
         SX PseudospectralSegment::get_final_state_deviant()

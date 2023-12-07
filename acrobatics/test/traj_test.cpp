@@ -44,6 +44,10 @@ int main(int argc, char **argv)
     // Map the array to Eigen matrix
     Eigen::Map<ConfigVector> q0_vec(q0, 19);
 
+    std::vector<double> q0_stdvec = {
+        0, 0, 1.0627, 0, 0, 0, 1, 0.0000, 0.0000, -0.3207, 0.7572, -0.4365,
+        0.0000, 0.0000, 0.0000, -0.3207, 0.7572, -0.4365, 0.0000};
+
     Model model;
     pinocchio::urdf::buildModel(huron_location, model);
     Data data(model);
@@ -160,7 +164,22 @@ int main(int argc, char **argv)
     variables::TrajectoryOpt traj(opts, si, problem);
     printf("Finished\n");
 
-    traj.init_finite_elements(2);
+    casadi::DM X0 = casadi::DM::zeros(si->nx, 1);
+    std::cout << "X0: "<<X0 << std::endl;
+
+    for (int i = si->nh + si->ndh; i < si->nh + si->ndh + si->nq; ++i)
+    {
+        X0(i) = q0_stdvec[i];
+    }
+    
+    std::cout << "X0: "<<X0 << std::endl;
+
+    printf("Here");
+
+    traj.init_finite_elements(2, X0);
+
+    auto sol = traj.optimize();
+    std::cout << sol << std::endl;
 
     return 0;
 }

@@ -5,6 +5,7 @@
 #include <cassert>
 #include "Variables/States.h"
 #include "Variables/Constraint.h"
+#include <bits/stdc++.h>
 #include <Eigen/Sparse>
 
 namespace acro
@@ -114,8 +115,8 @@ namespace acro
 
             /**
              * @brief Fill all times with the time vector from this segment
-             * 
-             * @param all_times 
+             *
+             * @param all_times
              */
             void fill_times(std::vector<double> &all_times);
 
@@ -144,24 +145,31 @@ namespace acro
             void evaluate_expression_graph(casadi::SX &J0, casadi::SXVector &g);
 
             /**
+             * @brief Get the initial state
+             *
+             * @return casadi::SX
+             */
+            casadi::SX get_initial_state();
+
+            /**
              * @brief Get the initial state deviant
              *
-             * @return casadi::SX 
+             * @return casadi::SX
              */
             casadi::SX get_initial_state_deviant();
 
             /**
              * @brief Get the final state deviant
              *
-             * @return casadi::SX 
+             * @return casadi::SX
              */
             casadi::SX get_final_state_deviant();
 
             /**
              * @brief Get the actual final state
-             * 
-             * @return casadi::SX 
-            */
+             *
+             * @return casadi::SX
+             */
             casadi::SX get_final_state();
 
             /**
@@ -181,22 +189,22 @@ namespace acro
 
             /**
              * @brief Returns the starting and ending index in w (call after fill_w!)
-             * 
-             * @return tuple_size_t 
+             *
+             * @return tuple_size_t
              */
             tuple_size_t get_range_idx_decision_variables();
 
             /**
              * @brief Returns the starting and ending index in g (call after evaluate_expression_graph!)
-             * 
+             *
              * @return tuple_size_t
              */
             tuple_size_t get_range_idx_constraint_expressions();
 
             /**
              * @brief Returns the starting and ending index in g (call after fill_lb_ub!). This should match get_range_idx_constraint_expressions
-             * 
-             * @return tuple_size_t 
+             *
+             * @return tuple_size_t
              */
             tuple_size_t get_range_idx_bounds();
 
@@ -214,7 +222,7 @@ namespace acro
             casadi::SXVector U_var_vec;
 
             /**
-             * @brief Collocation input decision expressions at the state collocation points 
+             * @brief Collocation input decision expressions at the state collocation points
              * (decision variables of control and state are potentially approximated by different degree polynomials)
              *
              */
@@ -352,19 +360,19 @@ namespace acro
 
             /**
              * @brief Starting and ending index of the decision variables in w corresponding to this segment
-             * 
+             *
              */
             tuple_size_t w_range;
 
             /**
              * @brief Starting and ending index of the constraint expressions in g corresponding to this segment. This should match lb_ub_range
-             * 
+             *
              */
             tuple_size_t g_range;
 
             /**
              * @brief Starting and ending index of the bounds in lb/ub corresponding to this segment. This should match g_range
-             * 
+             *
              */
             tuple_size_t lb_ub_range;
         };

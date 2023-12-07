@@ -15,7 +15,7 @@ namespace acro
             this->Phi = problem->Phi;
         }
 
-        void TrajectoryOpt::init_finite_elements(int d)
+        void TrajectoryOpt::init_finite_elements(int d, casadi::DM X0)
         {
             this->w.clear();
             this->g.clear();
@@ -25,16 +25,16 @@ namespace acro
 
             this->all_times.clear();
 
-            casadi::SX prev_final_state;
+            casadi::SX prev_final_state = X0;
             casadi::SX prev_final_state_deviant;
             casadi::SX curr_initial_state_deviant;
 
-            std::vector<double> equality_back(this->state_indices->ndx, 0.0);
+            std::vector<double> equality_back(this->state_indices->nx, 0.0);
             // std::size_t i = 0;
             printf("Starting\n");
-            for (std::size_t i = 0; i < 3; ++i)
+            for (std::size_t i = 0; i < 2; ++i)
             {
-                auto ps = PseudospectralSegment(d, 3, 0.2, this->state_indices, this->Fint);
+                auto ps = PseudospectralSegment(d, 2, 0.2, this->state_indices, this->Fint);
                 ps.initialize_knot_segments(prev_final_state);
                 /*TODO: Fill with user defined functions, and handle global/phase-dependent/time-varying constraints*/
                 std::vector<std::shared_ptr<ConstraintData>> G;
@@ -44,22 +44,28 @@ namespace acro
                 ps.fill_lb_ub(this->lb, this->ub);
                 ps.fill_w(this->w);
                 ps.fill_times(this->all_times);
-                if (i > 0)
+                if (i == 0) {
+                    // auto curr_initial_state = ps.get_initial_state();
+                    // this->g.push_back(prev_final_state - curr_initial_state);
+                    // this->lb.insert(this->lb.end(), equality_back.begin(), equality_back.end());
+                    // this->ub.insert(this->ub.end(), equality_back.begin(), equality_back.end());
+                }
+                else if (i > 0)
                 {
                     curr_initial_state_deviant = ps.get_initial_state_deviant();
                     /*For general jump map functions you can use the following syntax:*/
                     // g.push_back(jump_map_function(casadi::SXVector{prev_final_state_deviant, curr_initial_state_deviant}).at(0));
-                    this->g.push_back(prev_final_state_deviant - curr_initial_state_deviant);
-                    this->lb.insert(this->lb.end(), equality_back.begin(), equality_back.end());
-                    this->ub.insert(this->ub.end(), equality_back.begin(), equality_back.end());
+                    // this->g.push_back(prev_final_state_deviant - curr_initial_state_deviant);
+                    // this->lb.insert(this->lb.end(), equality_back.begin(), equality_back.end()-1);
+                    // this->ub.insert(this->ub.end(), equality_back.begin(), equality_back.end()-1);
                 }
                 prev_final_state = ps.get_final_state();
                 prev_final_state_deviant = ps.get_final_state_deviant();
-                if (i == 2)
-                {
-                    /*Add terminal cost*/
-                    this->J += this->Phi(casadi::SXVector{prev_final_state}).at(0);
-                }
+                // if (i == 2)
+                // {
+                //     /*Add terminal cost*/
+                //     this->J += this->Phi(casadi::SXVector{prev_final_state}).at(0);
+                // }
                 // ++i;
             }
             printf("Finished init\n");
@@ -67,6 +73,12 @@ namespace acro
 
         casadi::DMDict TrajectoryOpt::optimize()
         {
+            std::cout << vertcat(this->w).size() << std::endl;
+            std::cout << vertcat(this->g).size() << std::endl;
+            std::cout << this->lb.size() << std::endl;
+            std::cout << this->ub.size() << std::endl;
+            printf("HERE!!!!!!!!!!!!!!!!!!\n");
+
             casadi::SXDict nlp = {{"x", vertcat(this->w)},
                                   {"f", this->J},
                                   {"g", vertcat(this->g)}};

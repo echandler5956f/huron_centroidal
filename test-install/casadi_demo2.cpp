@@ -6,7 +6,7 @@
 using namespace casadi;
 using namespace std;
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
   // Degree of interpolating polynomial
   int d = 3;
@@ -174,7 +174,7 @@ int main(int argc, char** argv)
     xcs = horzcat(xcs, var_xcs[k]);
     xsoffset = horzcat(xsoffset, var_xs[k + 1]);
   }
-
+  std::cout << "feqmap: " << feqmap(vector<MX>{xcs, xs, us}).at(0).size() << std::endl;
   opti.subject_to(feqmap(vector<MX>{xcs, xs, us}).at(0) == 0);
   opti.subject_to(fxfmap(vector<MX>{xcs, xs, us}).at(0) - xsoffset == 0);
   J = fxqfold(vector<MX>{J, xcs, xs, us}).at(0);

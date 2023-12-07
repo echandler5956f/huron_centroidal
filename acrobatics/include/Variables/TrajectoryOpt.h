@@ -29,7 +29,7 @@ namespace acro
              * @param contacts The phase sequence
              * @param d The degree of the finite element polynomials
              */
-            void init_finite_elements( int d);
+            void init_finite_elements(int d, casadi::DM X0);
 
             /**
              * @brief Optimize and return the solution
