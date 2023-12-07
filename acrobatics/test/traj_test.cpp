@@ -35,7 +35,7 @@ typedef ADModel::TangentVectorType TangentVectorAD;
 
 const std::string huron_location = "resources/urdf/huron_cheat.urdf";
 
-int main(int argc, char**argv)
+int main(int argc, char **argv)
 {
     double q0[] = {
         0, 0, 1.0627, 0, 0, 0, 1, 0.0000, 0.0000, -0.3207, 0.7572, -0.4365,
@@ -43,7 +43,6 @@ int main(int argc, char**argv)
 
     // Map the array to Eigen matrix
     Eigen::Map<ConfigVector> q0_vec(q0, 19);
-
 
     Model model;
     pinocchio::urdf::buildModel(huron_location, model);
@@ -55,7 +54,6 @@ int main(int argc, char**argv)
     pinocchio::computeTotalMass(model, data);
     pinocchio::framesForwardKinematics(model, data, q0_vec);
 
-
     auto mass = data.mass[0];
     auto g = casadi::SX::zeros(3, 1);
     g(2) = 9.81;
@@ -66,7 +64,6 @@ int main(int argc, char**argv)
     casadi::SX cx = casadi::SX::sym("x", si->nx);
     casadi::SX cdx = casadi::SX::sym("dx", si->ndx);
     casadi::SX cu = casadi::SX::sym("u", si->nu);
-    casadi::SX cvju = casadi::SX::sym("u", si->nvju);
     casadi::SX cdt = casadi::SX::sym("dt");
 
     auto ch = si->get_ch(cx);
@@ -81,22 +78,36 @@ int main(int argc, char**argv)
     auto cvj = si->get_vj(cx);
     auto cf = si->get_f(cu);
     auto ctau = si->get_tau(cu);
+    auto cvju = si->get_vju(cu);
+
+    // std::cout << "ch.size: " << ch.size() << std::endl;
+    // std::cout << "ch_d.size: " << ch_d.size() << std::endl;
+    // std::cout << "cdh.size: " << cdh.size() << std::endl;
+    // std::cout << "cdh_d.size: " << cdh_d.size() << std::endl;
+    // std::cout << "cq.size: " << cq.size() << std::endl;
+    // std::cout << "cq_d.size: " << cq_d.size() << std::endl;
+    // std::cout << "cqj.size: " << cqj.size() << std::endl;
+    // std::cout << "cv.size: " << cv.size() << std::endl;
+    // std::cout << "cv_d.size: " << cv_d.size() << std::endl;
+    // std::cout << "cvj.size: " << cvj.size() << std::endl;
+    // std::cout << "cf.size: " << cf.size() << std::endl;
+    // std::cout << "ctau.size: " << ctau.size() << std::endl;
+    // std::cout << "cvju.size: " << cvju.size() << std::endl;
 
     ConfigVectorAD cq_AD(model.nq);
-    for(Eigen::DenseIndex k = 0; k < model.nq; ++k)
+    for (Eigen::DenseIndex k = 0; k < model.nq; ++k)
     {
         cq_AD[k] = cq(k);
     }
 
     TangentVectorAD cv_AD(model.nv);
-    for(Eigen::DenseIndex k = 0; k < model.nv; ++k)
+    for (Eigen::DenseIndex k = 0; k < model.nv; ++k)
     {
         cv_AD[k] = cv(k);
     }
 
-
     TangentVectorAD cq_d_AD(model.nv);
-    for(Eigen::DenseIndex k = 0; k < model.nv; ++k)
+    for (Eigen::DenseIndex k = 0; k < model.nv; ++k)
     {
         cq_d_AD[k] = cq_d(k);
     }
@@ -105,7 +116,6 @@ int main(int argc, char**argv)
     pinocchio::computeCentroidalMap(cmodel, cdata, cq_AD);
     pinocchio::forwardKinematics(cmodel, cdata, cq_AD, cv_AD);
     pinocchio::updateFramePlacements(cmodel, cdata);
-
 
     auto intres = pinocchio::integrate(cmodel, cq_AD, cq_d_AD);
     casadi::SX tmp1 = casadi::SX::zeros(intres.rows(), 1);
@@ -123,7 +133,7 @@ int main(int argc, char**argv)
     pinocchio::casadi::copy(Ag, tmp2);
 
     auto F = casadi::Function("F",
-                              casadi::SXVector{cx, cu, cvju},
+                              casadi::SXVector{cx, cu},
                               casadi::SXVector{vertcat(cdh,
                                                        (cf - mass * g) / mass,
                                                        ctau / mass, cv,
@@ -134,7 +144,7 @@ int main(int argc, char**argv)
     pinocchio::casadi::copy(q0_vec, tmp3);
 
     auto L = casadi::Function("L",
-                              casadi::SXVector{cx, cu, cvju},
+                              casadi::SXVector{cx, cu},
                               casadi::SXVector{1e-3 * casadi::SX::sumsqr(cvju),
                                                1e-4 * casadi::SX::sumsqr(cf),
                                                1e-4 * casadi::SX::sumsqr(ctau),
@@ -149,6 +159,8 @@ int main(int argc, char**argv)
     variables::ProblemData *problem = new variables::ProblemData(Fint, F, L, Phi);
     variables::TrajectoryOpt traj(opts, si, problem);
     printf("Finished\n");
+
+    traj.init_finite_elements(2);
 
     return 0;
 }

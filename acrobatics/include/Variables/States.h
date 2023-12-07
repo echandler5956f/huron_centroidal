@@ -31,7 +31,7 @@ namespace acro
              * @brief Input space dimension
              *
              */
-            static const int nu = 6;
+            static const int nF = 6;
 
             /**
              * @brief Momenta space dimension
@@ -43,7 +43,7 @@ namespace acro
              * @brief Momenta time derivative offset
              *
              */
-            static const int ndh = 12;
+            static const int ndh = 6;
 
             /**
              * @brief Number of position coordinates for the base
@@ -80,7 +80,7 @@ namespace acro
             template <class Sym>
             const Sym get_ch_d(const Sym &cdx)
             {
-                return cdx(casadi::Slice(0, this->ndh));
+                return cdx(casadi::Slice(0, this->nh));
             }
 
             /**
@@ -93,7 +93,7 @@ namespace acro
             template <class Sym>
             const Sym get_cdh(const Sym &cx)
             {
-                return cx(casadi::Slice(this->nh, this->ndh));
+                return cx(casadi::Slice(this->nh, this->nh + this->ndh));
             }
 
             /**
@@ -106,7 +106,7 @@ namespace acro
             template <class Sym>
             const Sym get_cdh_d(const Sym &cdx)
             {
-                return cdx(casadi::Slice(this->nh, this->ndh));
+                return cdx(casadi::Slice(this->nh, this->nh + this->ndh));
             }
 
             /**/
@@ -120,7 +120,7 @@ namespace acro
             template <class Sym>
             const Sym get_q(const Sym &cx)
             {
-                return cx(casadi::Slice(this->ndh, this->ndh + this->nq));
+                return cx(casadi::Slice(this->nh + this->ndh, this->nh + this->ndh + this->nq));
             }
 
             /**
@@ -133,7 +133,7 @@ namespace acro
             template <class Sym>
             const Sym get_q_d(const Sym &cdx)
             {
-                return cdx(casadi::Slice(this->ndh, this->ndh + this->nv));
+                return cdx(casadi::Slice(this->nh + this->ndh, this->nh + this->ndh + this->nv));
             }
 
             /**
@@ -146,7 +146,7 @@ namespace acro
             template <class Sym>
             const Sym get_qj(const Sym &cx)
             {
-                return cx(casadi::Slice(this->ndh + this->nqb, this->ndh + this->nq));
+                return cx(casadi::Slice(this->nh + this->ndh + this->nqb, this->nh + this->ndh + this->nq));
             }
 
             /**
@@ -159,7 +159,7 @@ namespace acro
             template <class Sym>
             const Sym get_v(const Sym &cx)
             {
-                return cx(casadi::Slice(this->ndh + this->nq, this->nx));
+                return cx(casadi::Slice(this->nh + this->ndh + this->nq, this->nx));
             }
 
             /**
@@ -172,7 +172,7 @@ namespace acro
             template <class Sym>
             const Sym get_v_d(const Sym &cdx)
             {
-                return cdx(casadi::Slice(this->ndh + this->nv, this->ndx));
+                return cdx(casadi::Slice(this->nh + this->ndh + this->nv, this->ndx));
             }
 
             /**
@@ -185,11 +185,11 @@ namespace acro
             template <class Sym>
             const Sym get_vj(const Sym &cx)
             {
-                return cx(casadi::Slice(this->ndh + this->nq + this->nvb, this->nx));
+                return cx(casadi::Slice(this->nh + this->ndh + this->nq + this->nvb, this->nx));
             }
 
             /**
-             * @brief Get f: floor(nu/2) x 1
+             * @brief Get f: 3 x 1
              *
              * @tparam Sym
              * @param u
@@ -202,7 +202,7 @@ namespace acro
             }
 
             /**
-             * @brief Get tau: floor(nu/2) x 1
+             * @brief Get tau: 3 x 1
              *
              * @tparam Sym
              * @param u
@@ -211,7 +211,20 @@ namespace acro
             template <class Sym>
             const Sym get_tau(const Sym &u)
             {
-                return u(casadi::Slice(3, this->nu));
+                return u(casadi::Slice(3, this->nF));
+            }
+
+            /**
+             * @brief Get tau: nvju x 1
+             *
+             * @tparam Sym
+             * @param u
+             * @return const Sym
+             */
+            template <class Sym>
+            const Sym get_vju(const Sym &u)
+            {
+                return u(casadi::Slice(this->nF, this->nu));
             }
 
             /**
@@ -237,6 +250,12 @@ namespace acro
              *
              */
             int ndx;
+
+            /**
+             * @brief Number of input variables (nF + nvju)
+             *
+             */
+            int nu;
 
             /**
              * @brief Number of joint velocity inputs

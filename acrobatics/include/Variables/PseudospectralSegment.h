@@ -121,9 +121,10 @@ namespace acro
 
             /**
              * @brief Create all the knot segments
+             * @param Starting state to integrate from. Can be a constant
              *
              */
-            void initialize_knot_segments();
+            void initialize_knot_segments(casadi::SX x0);
 
             /**
              * @brief Build the function graph
@@ -143,15 +144,24 @@ namespace acro
             void evaluate_expression_graph(casadi::SX &J0, casadi::SXVector &g);
 
             /**
-             * @brief Get the initial state
+             * @brief Get the initial state deviant
              *
+             * @return casadi::SX 
              */
-            casadi::SX get_initial_state();
+            casadi::SX get_initial_state_deviant();
 
             /**
-             * @brief Get the final state
+             * @brief Get the final state deviant
              *
+             * @return casadi::SX 
              */
+            casadi::SX get_final_state_deviant();
+
+            /**
+             * @brief Get the actual final state
+             * 
+             * @return casadi::SX 
+            */
             casadi::SX get_final_state();
 
             /**
@@ -204,10 +214,23 @@ namespace acro
             casadi::SXVector U_var_vec;
 
             /**
-             * @brief Knot point state decision variables
+             * @brief Collocation input decision expressions at the state collocation points 
+             * (decision variables of control and state are potentially approximated by different degree polynomials)
+             *
+             */
+            casadi::SXVector U_at_c_vec;
+
+            /**
+             * @brief Knot point deviants state decision variables
              *
              */
             casadi::SXVector dX0_var_vec;
+
+            /**
+             * @brief Knot point state expressions (integral functions of the deviants)
+             *
+             */
+            casadi::SXVector X0_var_vec;
 
             /**
              * @brief Implicit discrete-time function map. This function map returns the vector of collocation equations
@@ -267,10 +290,16 @@ namespace acro
             casadi::SXVector Uc;
 
             /**
-             * @brief Knot states used to build the expression graphs
+             * @brief Knot states deviants used to build the expression graphs
              *
              */
             casadi::SX dX0;
+
+            /**
+             * @brief Knot states used to build the expression graphs
+             *
+             */
+            casadi::SX X0;
 
             /**
              * @brief Accumulator expression used to build the expression graphs
