@@ -165,14 +165,12 @@ int main(int argc, char **argv)
     printf("Finished\n");
 
     casadi::DM X0 = casadi::DM::zeros(si->nx, 1);
-    std::cout << "X0: "<<X0 << std::endl;
-
+    int j = 0;
     for (int i = si->nh + si->ndh; i < si->nh + si->ndh + si->nq; ++i)
     {
-        X0(i) = q0_stdvec[i];
+        X0(i) = q0_stdvec[j];
+        ++j;
     }
-    
-    std::cout << "X0: "<<X0 << std::endl;
 
     printf("Here");
 

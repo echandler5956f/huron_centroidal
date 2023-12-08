@@ -32,9 +32,9 @@ namespace acro
             std::vector<double> equality_back(this->state_indices->nx, 0.0);
             // std::size_t i = 0;
             printf("Starting\n");
-            for (std::size_t i = 0; i < 2; ++i)
+            for (std::size_t i = 0; i < 1; ++i)
             {
-                auto ps = PseudospectralSegment(d, 2, 0.2, this->state_indices, this->Fint);
+                auto ps = PseudospectralSegment(d, 1, 0.2, this->state_indices, this->Fint);
                 ps.initialize_knot_segments(prev_final_state);
                 /*TODO: Fill with user defined functions, and handle global/phase-dependent/time-varying constraints*/
                 std::vector<std::shared_ptr<ConstraintData>> G;
@@ -44,7 +44,8 @@ namespace acro
                 ps.fill_lb_ub(this->lb, this->ub);
                 ps.fill_w(this->w);
                 ps.fill_times(this->all_times);
-                if (i == 0) {
+                if (i == 0)
+                {
                     // auto curr_initial_state = ps.get_initial_state();
                     // this->g.push_back(prev_final_state - curr_initial_state);
                     // this->lb.insert(this->lb.end(), equality_back.begin(), equality_back.end());
@@ -73,8 +74,10 @@ namespace acro
 
         casadi::DMDict TrajectoryOpt::optimize()
         {
-            std::cout << vertcat(this->w).size() << std::endl;
-            std::cout << vertcat(this->g).size() << std::endl;
+            std::cout << "w: " << vertcat(this->w) << std::endl;
+            std::cout << "g: " << vertcat(this->g) << std::endl;
+            std::cout << "size w: " << vertcat(this->w).size() << std::endl;
+            std::cout << "size g: " << vertcat(this->g).size() << std::endl;
             std::cout << this->lb.size() << std::endl;
             std::cout << this->ub.size() << std::endl;
             printf("HERE!!!!!!!!!!!!!!!!!!\n");
