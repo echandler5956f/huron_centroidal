@@ -8,6 +8,8 @@
 #include <bits/stdc++.h>
 #include <Eigen/Sparse>
 
+using namespace casadi;
+
 namespace acro
 {
     namespace variables
@@ -41,9 +43,9 @@ namespace acro
              *
              * @param t Time to interpolate at
              * @param terms Terms at knot points to use for interpolation
-             * @return const casadi::SX Resultant expression for the symbolic interpolated value
+             * @return const SX Resultant expression for the symbolic interpolated value
              */
-            const casadi::SX lagrange_interpolation(double t, const casadi::SXVector terms);
+            const SX lagrange_interpolation(double t, const SXVector terms);
 
             /**
              * @brief Degree of the polynomial
@@ -95,10 +97,10 @@ namespace acro
              * @param d Polynomial degree
              * @param knot_num_ Number of knots in the segment
              * @param h_ Period of each knot segment
-             * @param state_indices_ Pointer to the state indices helper
+             * @param st_m_ Pointer to the state indices helper
              * @param Fint_ Integrator function
              */
-            PseudospectralSegment(int d, int knot_num_, double h_, States *state_indices_, casadi::Function &Fint_);
+            PseudospectralSegment(int d, int knot_num_, double h_, States *st_m_, Function &Fint_);
 
             /**
              * @brief Initialize the relevant expressions
@@ -122,10 +124,10 @@ namespace acro
 
             /**
              * @brief Create all the knot segments
-             * @param Starting state to integrate from. Can be a constant
+             * @param x0 Starting state to integrate from. Can be a constant
              *
              */
-            void initialize_knot_segments(casadi::SX x0);
+            void initialize_knot_segments(SX x0);
 
             /**
              * @brief Build the function graph
@@ -134,7 +136,7 @@ namespace acro
              * @param L Integrated cost
              * @param G Vector of constraint data
              */
-            void initialize_expression_graph(casadi::Function &F, casadi::Function &L, std::vector<std::shared_ptr<ConstraintData>> G);
+            void initialize_expression_graph(Function &F, Function &L, std::vector<std::shared_ptr<ConstraintData>> G);
 
             /**
              * @brief Evaluate the expressions with the actual decision variables
@@ -142,35 +144,35 @@ namespace acro
              * @param J0 Accumulated cost so far
              * @param g Constraint vector to fill
              */
-            void evaluate_expression_graph(casadi::SX &J0, casadi::SXVector &g);
+            void evaluate_expression_graph(SX &J0, SXVector &g);
 
             /**
              * @brief Get the initial state
              *
-             * @return casadi::SX
+             * @return SX
              */
-            casadi::SX get_initial_state();
+            SX get_initial_state();
 
             /**
              * @brief Get the initial state deviant
              *
-             * @return casadi::SX
+             * @return SX
              */
-            casadi::SX get_initial_state_deviant();
+            SX get_initial_state_deviant();
 
             /**
              * @brief Get the final state deviant
              *
-             * @return casadi::SX
+             * @return SX
              */
-            casadi::SX get_final_state_deviant();
+            SX get_final_state_deviant();
 
             /**
              * @brief Get the actual final state
              *
-             * @return casadi::SX
+             * @return SX
              */
-            casadi::SX get_final_state();
+            SX get_final_state();
 
             /**
              * @brief Get lb/ub and fill
@@ -185,7 +187,7 @@ namespace acro
              *
              * @param w To fill
              */
-            void fill_w(casadi::SXVector &w);
+            void fill_w(SXVector &w);
 
             /**
              * @brief Returns the starting and ending index in w (call after fill_w!)
@@ -213,32 +215,32 @@ namespace acro
              * @brief Collocation state decision variables
              *
              */
-            casadi::SXVector dXc_var_vec;
+            SXVector dXc_var_vec;
 
             /**
              * @brief Collocation input decision variables
              *
              */
-            casadi::SXVector U_var_vec;
+            SXVector U_var_vec;
 
             /**
              * @brief Collocation input decision expressions at the state collocation points
              * (decision variables of control and state are potentially approximated by different degree polynomials)
              *
              */
-            casadi::SXVector U_at_c_vec;
+            SXVector U_at_c_vec;
 
             /**
              * @brief Knot point deviants state decision variables
              *
              */
-            casadi::SXVector dX0_var_vec;
+            SXVector dX0_var_vec;
 
             /**
              * @brief Knot point state expressions (integral functions of the deviants)
              *
              */
-            casadi::SXVector X0_var_vec;
+            SXVector X0_var_vec;
 
             /**
              * @brief Implicit discrete-time function map. This function map returns the vector of collocation equations
@@ -246,74 +248,74 @@ namespace acro
                 dynamics
              *
              */
-            casadi::Function collocation_constraint_map;
+            Function collocation_constraint_map;
 
             /**
              * @brief Implicit discrete-time function map. The map which matches the approximated final state expression with the initial
                 state of the next segment
              *
              */
-            casadi::Function xf_constraint_map;
+            Function xf_constraint_map;
 
             /**
              * @brief Implicit discrete-time function map. The accumulated cost across all the knot segments found using quadrature rules
              *
              */
-            casadi::Function q_cost_fold;
+            Function q_cost_fold;
 
             /**
              * @brief User defined constraints, which are functions with certain bounds associated with them
              *
              */
-            std::vector<casadi::Function> general_constraint_maps;
+            std::vector<Function> general_constraint_maps;
 
             /**
              * @brief Lower bounds associated with the general constraint maps
              *
              */
-            casadi::DM general_lb;
+            DM general_lb;
 
             /**
              * @brief Upper bounds associated with the general constraint maps
              *
              */
-            casadi::DM general_ub;
+            DM general_ub;
 
             /**
              * @brief Integrator function
              *
              */
-            casadi::Function Fint;
+            Function Fint;
 
             /**
              * @brief Collocation states used to build the expression graphs
              *
              */
-            casadi::SXVector dXc;
+            SXVector dXc;
 
             /**
              * @brief Collocation inputs used to build the expression graphs
              *
              */
-            casadi::SXVector Uc;
+            SXVector Uc;
 
             /**
              * @brief Knot states deviants used to build the expression graphs
              *
              */
-            casadi::SX dX0;
+            SX dX0;
 
             /**
              * @brief Knot states used to build the expression graphs
              *
              */
-            casadi::SX X0;
+            SX X0;
 
             /**
              * @brief Accumulator expression used to build the expression graphs
              *
              */
-            casadi::SX Lc;
+            SX Lc;
 
             /*Helper class to store polynomial information*/
             /**
@@ -344,7 +346,7 @@ namespace acro
              * @brief Vector of all times
              *
              */
-            casadi::DM times;
+            DM times;
 
             /**
              * @brief Period of EACH KNOT SEGMENT within this pseudospectral segment

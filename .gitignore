@@ -2,3 +2,5 @@
 .venv/
 build/
 test-install/build/
+docs/html
+docs/latex

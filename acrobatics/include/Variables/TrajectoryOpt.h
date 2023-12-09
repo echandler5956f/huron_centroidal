@@ -26,8 +26,8 @@ namespace acro
             /**
              * @brief Initialize the finite elements
              *
-             * @param contacts The phase sequence
              * @param d The degree of the finite element polynomials
+             * @param X0 The initial state to deviate from
              */
             void init_finite_elements(int d, casadi::DM X0);
 
