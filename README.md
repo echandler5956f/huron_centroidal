@@ -6,9 +6,11 @@
 Named after the famous scientist who posed one variation of the Brachistochrone problem, galileo is an efficient optimal control that uses Gauss-Legendre Pseudospectral Collocation to solve the switched systems problem for legged robots.
 
 Features:  
-:heavy_check_mark: Intuitive and efficient formulation of variables, cost and constraints using [casadi] and [pinocchio].   
+:heavy_check_mark: Intuitive and efficient formulation of variables, cost and constraints using [casadi].   
 
-:heavy_check_mark: [casadi] enables using the high-performance solvers [Ipopt] and [Snopt].  
+:heavy_check_mark: Solver interface nables using the high-performance solvers [Ipopt] and [Snopt].  
+
+:heavy_check_mark: [pinocchio] makes custom robot integration as simple as switching the URDF.
 
 :heavy_check_mark: [ROS]/[catkin] integration (optional).
 
